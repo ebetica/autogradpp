@@ -32,16 +32,17 @@ void ContainerImpl::cuda() {
   for (auto& pair : children_) {
     pair.second->cuda();
   }
-  /* Can't do in place operation since .toBackend isn't implemented for variables
-     for (auto& pair : params_) {
-     pair.second.toBackend(at::kCUDA);
-     }
-     */
+  // Can't do in place operation since .toBackend isn't implemented for variables
+  /*
+  for (auto& pair : params_) {
+    Variable(pair.second.toBackend(at::kCUDA)).detach_();
+  }
+  */
   cuda_ = true;
   // So we hack it...
   auto copied = params_;
   initialize_parameters();
-  for (auto pair : copied) {
+  for (auto pair : params_) {
     pair.second.data().copy_(copied[pair.first].data());
   }
 };
@@ -65,7 +66,7 @@ Container ContainerImpl::add(Container m, std::string const& name) {
   return this->children_[name];
 }
 
-Variable ContainerImpl::add(Variable v, std::string const& name) {
+Variable& ContainerImpl::add(Variable v, std::string const& name) {
   this->params_[name] = v;
   return this->params_[name];
 }
@@ -99,9 +100,9 @@ void Linear::reset_parameters() {
 }
 
 void Linear::initialize_parameters() {
-  weight = this->add(Var(DefaultTensor(at::kFloat).zeros({nout, nin}), true), "weight");
+  weight = this->add(Var(DefaultTensor(at::kFloat).tensor({nout, nin}), true), "weight");
   if (!no_bias_) {
-    bias = this->add(Var(DefaultTensor(at::kFloat).zeros({nout}), true), "bias");
+    bias = this->add(Var(DefaultTensor(at::kFloat).tensor({nout}), true), "bias");
   }
 }
 
@@ -123,9 +124,9 @@ void Conv::initialize_parameters() {
     wsize.push_back(in_channels_ / groups_);
   }
   wsize.insert(wsize.end(), ks_.begin(), ks_.end());
-  weight = this->add(Var(DefaultTensor(at::kFloat).zeros(wsize), true), "weight");
+  weight = this->add(Var(DefaultTensor(at::kFloat).tensor(wsize), true), "weight");
   if (!no_bias_) {
-    bias = this->add(Var(DefaultTensor(at::kFloat).zeros({out_channels_}), true), "bias");
+    bias = this->add(Var(DefaultTensor(at::kFloat).tensor({out_channels_}), true), "bias");
   } else {
     assert(!bias.defined());
   }
@@ -224,9 +225,20 @@ variable_list Dropout::forward(variable_list inputs) {
   if (p_ == 0) return inputs;
   variable_list lst;
   for (auto x : inputs) {
-    auto noise = DefaultTensor(at::kFloat).tensor(x.sizes());
+    auto noise = x.data().type().tensor(x.sizes());
     (noise.uniform_(0, 1) > p_).mul_(1. / (1 - p_));
-    lst.push_back(x * Var(noise.toType(x.data().type())));
+    lst.push_back(x * Var(noise));
+  }
+  return lst;
+}
+
+variable_list Dropout2d::forward(variable_list inputs) {
+  if (p_ == 0) return inputs;
+  variable_list lst;
+  for (auto x : inputs) {
+    auto noise = x.data().type().tensor({x.size(0), x.size(1), 1, 1});
+    (noise.uniform_(0, 1) > p_).mul_(1. / (1 - p_));
+    lst.push_back(x * Var(noise));
   }
   return lst;
 }

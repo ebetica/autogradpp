@@ -58,7 +58,7 @@ class ContainerImpl {
  protected:
   Container add(Container, std::string const&);
   // Be careful when registering Tensors that are not variables
-  Variable add(Variable, std::string const&);
+  Variable& add(Variable, std::string const&);
 };
 
 template <class Derived>
@@ -214,6 +214,14 @@ class Conv1d : public Conv {
 AUTOGRAD_CONTAINER_CLASS(Dropout) {
  public:
   Dropout(double p=0.5) : p_(p) { assert(p < 1 && p >= 0); }
+  variable_list forward(variable_list) override;
+ protected:
+  double p_;
+};
+
+AUTOGRAD_CONTAINER_CLASS(Dropout2d) {
+ public:
+  Dropout2d(double p=0.5) : p_(p) { assert(p < 1 && p >= 0); }
   variable_list forward(variable_list) override;
  protected:
   double p_;

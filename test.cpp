@@ -1,3 +1,4 @@
+#include <map>
 #include "autograd.h"
 using namespace autograd;
 
@@ -7,8 +8,8 @@ using namespace autograd;
 #define STR(x) STR_HELPER(x)
 #define EXPECT(CODE) if (CODE); else { throw std::runtime_error(__FILE__ ":" STR(__LINE__) ": " #CODE); }
 
-std::unordered_map<std::string, void (*)()> constuct_tests() {
- std::unordered_map<std::string, void (*)()> tests;
+std::map<std::string, void (*)()> constuct_tests() {
+ std::map<std::string, void (*)()> tests;
 
  tests["autograd/conv2d/even"] = []() {
     at::CPU(at::kFloat).randn({2, 3, 5, 5}).size(0);
@@ -213,7 +214,9 @@ std::unordered_map<std::string, void (*)()> constuct_tests() {
  };
 
 
- tests["autograd/integration/mnist"] = []() {
+ tests["autograd/~integration/mnist"] = []() {  // ~ will make it run last :D
+   std::cout << "Training MNST for 3 epochs, get a coffee!\n";
+   auto useGPU = true;
    struct MNIST_Reader
    {
      FILE *fp_;
@@ -246,8 +249,6 @@ std::unordered_map<std::string, void (*)()> constuct_tests() {
      int image_rows = rd.read_int();
      int image_cols = rd.read_int();
 
-     std::cout << "Images: magic=" << image_magic << ", count=" << image_count << ", rows=" << image_rows << ", cols=" << image_cols << std::endl;
-
      auto data = at::CPU(at::kFloat).tensor({image_count, 1, image_rows, image_cols});
      auto a_data = data.accessor<float, 4>();
 
@@ -257,14 +258,13 @@ std::unordered_map<std::string, void (*)()> constuct_tests() {
            a_data[c][0][i][j] = float(rd.read_byte()) / 255;
      }     
 
-     return data.toBackend(at::kCPU);
+     return data.toBackend(useGPU ? at::kCUDA : at::kCPU);
    };
 
    auto readLabels = [&](std::string fn) {
      MNIST_Reader rd(fn.c_str());
      int label_magic = rd.read_int();
      int label_count = rd.read_int();
-     std::cout << "Labels: magic=" << label_magic << ", count=" << label_count << std::endl;
 
      auto data = at::CPU(at::kLong).tensor({label_count});
      auto a_data = data.accessor<long, 1>();
@@ -272,7 +272,7 @@ std::unordered_map<std::string, void (*)()> constuct_tests() {
      for (int i = 0; i < label_count; ++i) {
        a_data[i] = long(rd.read_byte());
      }
-     return data.toBackend(at::kCPU);
+     return data.toBackend(useGPU ? at::kCUDA : at::kCPU);
    };
 
    auto trdata = readData("mnist/train-images-idx3-ubyte");
@@ -280,33 +280,34 @@ std::unordered_map<std::string, void (*)()> constuct_tests() {
    auto tedata = readData("mnist/t10k-images-idx3-ubyte");
    auto telabel = readLabels("mnist/t10k-labels-idx1-ubyte");
 
-   auto convolutions = ContainerList()
-     .append(Conv2d(1, 32, 3).make())
-     .append(Conv2d(32, 32, 3).make())
-     .append(Conv2d(32, 32, 3).padding(1).stride(2).make())
-     .append(Conv2d(32, 32, 3).make())
-     .append(Conv2d(32, 32, 3).make())
-     .append(Conv2d(32, 32, 3).stride(2).make())
-     .append(Conv2d(32, 32, 3).make())
-     .make();
    auto model = SimpleContainer().make();
-   model->add(convolutions, "convolutions");
-   auto linear = model->add(Linear(32, 10).make(), "linear");
-   //model->cuda();
+   auto conv1 = model->add(Conv2d(1, 10, 5).make(), "conv1");
+   auto conv2 = model->add(Conv2d(10, 20, 5).make(), "conv2");
+   auto drop = Dropout(0.3).make();
+   auto drop2d = Dropout2d(0.3).make();
+   auto linear1 = model->add(Linear(320, 50).make(), "linear1");
+   auto linear2 = model->add(Linear(50, 10).make(), "linear2");
+   if (useGPU) model->cuda();
    
-   auto optim = SGD(model, 1e-1).momentum(0.9).nesterov().weight_decay(1e-6).make(); 
+   auto optim = SGD(model, 1e-2).momentum(0.5).make(); 
 
    auto forward = [&](Variable x) {
-     for (auto layer : *convolutions) x = layer->forward({x})[0].clamp_min(0);
+     x = std::get<0>(at::max_pool2d(conv1->forward({x})[0], {2, 2})).clamp_min(0);
+     x = conv2->forward({x})[0];
+     x = drop2d->forward({x})[0];
+     x = std::get<0>(at::max_pool2d(x, {2, 2})).clamp_min(0);
 
-     x = x.squeeze();
-     x = at::log_softmax(linear->forward({x})[0], 1);
+     x = x.view({-1, 320});
+     x = linear1->forward({x})[0].clamp_min(0);
+     x = drop->forward({x})[0];
+     x = linear2->forward({x})[0];
+     x = at::log_softmax(x, 1);
      return x;
    };
 
    float running_loss = 3;
    int epoch = 0;
-   auto bs = 256U;
+   auto bs = 32U;
    for (auto epoch = 0U; epoch < 3; epoch++) {
      auto shuffled_inds = std::vector<int>(trdata.size(0));
      for (int i=0; i < trdata.size(0); i++) {
@@ -314,8 +315,8 @@ std::unordered_map<std::string, void (*)()> constuct_tests() {
      }
      std::random_shuffle(shuffled_inds.begin(), shuffled_inds.end());
 
-     auto inp = at::CPU(at::kFloat).tensor({bs, 1, trdata.size(2), trdata.size(3)});
-     auto lab = at::CPU(at::kLong).tensor({bs});
+     auto inp = (useGPU ? at::CUDA : at::CPU)(at::kFloat).tensor({bs, 1, trdata.size(2), trdata.size(3)});
+     auto lab = (useGPU ? at::CUDA : at::CPU)(at::kLong).tensor({bs});
      for (auto p = 0U; p < shuffled_inds.size() - bs; p++) {
        inp[p % bs] = trdata[shuffled_inds[p]];
        lab[p % bs] = trlabel[shuffled_inds[p]];
@@ -329,33 +330,28 @@ std::unordered_map<std::string, void (*)()> constuct_tests() {
        backward(loss);
        optim->step(); 
 
-       auto print_freq = 10;
-       if (p % (bs * 10) == bs * 10 - 1) {
-         running_loss = running_loss * 0.99 + loss.data().sum().toCFloat() * 0.01;
+       /*
+       auto print_freq = 100;
+       if (p % (bs * print_freq) == bs * print_freq - 1) {
+         running_loss = running_loss * 0.9 + loss.data().sum().toCFloat() * 0.1;
          std::cout << p << ": " << running_loss << "\n";
        }
+       */
      }
    }
 
    auto result = std::get<1>(forward(Var(tedata, false, true)).max(1));
-   auto correct = (result == telabel).sum().toCFloat();
-   std::cout << "Num correct: " << correct << std::endl;
-   
+   Variable correct = (result == Var(telabel)).toType(at::kFloat);
+   std::cout << "Num correct: " << correct.data().sum().toCFloat() 
+     << " out of " << telabel.size(0) << std::endl;
+   EXPECT(correct.data().sum().toCFloat() > telabel.size(0) * 0.8);
+   return;
  };
 
  return tests;
 }
 
 int main(int argc, char** argv) {
-  /*
-  auto W = Var(at::CPU(at::kFloat).randn({10, 10}), true);
-  auto x = Var(at::CPU(at::kFloat).randn({5, 10}), true);
-  Variable z = x.mm(W);
-  backward(z);
-  */
-  
-  constuct_tests()["autograd/integration/mnist"]();
-  /*
   for (auto p : constuct_tests()) {
     if (argc == 1) {
       std::cout << "Doing " << p.first << "\n";
@@ -369,7 +365,6 @@ int main(int argc, char** argv) {
       }
     }
   }
-  */
 
   std::cout << "Done!\n";
   return 0;
