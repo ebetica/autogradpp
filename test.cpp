@@ -215,7 +215,7 @@ std::map<std::string, void (*)()> constuct_tests() {
 
 
  tests["autograd/~integration/mnist"] = []() {  // ~ will make it run last :D
-   std::cout << "Training MNST for 3 epochs, get a coffee!\n";
+   std::cout << "Training MNST for 3 epochs, rest your eyes for a bit!\n";
    auto useGPU = true;
    struct MNIST_Reader
    {
