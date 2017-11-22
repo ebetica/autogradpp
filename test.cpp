@@ -244,7 +244,7 @@ std::map<std::string, void (*)()> constuct_tests() {
    auto readData = [&](std::string fn) {
      MNIST_Reader rd(fn.c_str());
 
-     int image_magic = rd.read_int();
+     /* int image_magic = */ rd.read_int();
      int image_count = rd.read_int();
      int image_rows = rd.read_int();
      int image_cols = rd.read_int();
@@ -263,7 +263,7 @@ std::map<std::string, void (*)()> constuct_tests() {
 
    auto readLabels = [&](std::string fn) {
      MNIST_Reader rd(fn.c_str());
-     int label_magic = rd.read_int();
+     /* int label_magic = */ rd.read_int();
      int label_count = rd.read_int();
 
      auto data = at::CPU(at::kLong).tensor({label_count});
@@ -305,8 +305,7 @@ std::map<std::string, void (*)()> constuct_tests() {
      return x;
    };
 
-   float running_loss = 3;
-   int epoch = 0;
+   // float running_loss = 3;
    auto bs = 32U;
    for (auto epoch = 0U; epoch < 3; epoch++) {
      auto shuffled_inds = std::vector<int>(trdata.size(0));
