@@ -275,10 +275,10 @@ std::unordered_map<std::string, void (*)()> constuct_tests() {
      return data.toBackend(at::kCPU);
    };
 
-   auto trdata = readData("../autograd/mnist/train-images-idx3-ubyte");
-   auto trlabel = readLabels("../autograd/mnist/train-labels-idx1-ubyte");
-   // auto tedata = readData("../autograd/mnist/t10k-images-idx3-ubyte");
-   // auto telabel = readLabels("../autograd/mnist/t10k-labels-idx1-ubyte");
+   auto trdata = readData("mnist/train-images-idx3-ubyte");
+   auto trlabel = readLabels("mnist/train-labels-idx1-ubyte");
+   auto tedata = readData("mnist/t10k-images-idx3-ubyte");
+   auto telabel = readLabels("mnist/t10k-labels-idx1-ubyte");
 
    auto convolutions = ContainerList()
      .append(Conv2d(1, 32, 3).make())
@@ -292,15 +292,22 @@ std::unordered_map<std::string, void (*)()> constuct_tests() {
    auto model = SimpleContainer().make();
    model->add(convolutions, "convolutions");
    auto linear = model->add(Linear(32, 10).make(), "linear");
-   model->cuda();
+   //model->cuda();
    
    auto optim = SGD(model, 1e-1).momentum(0.9).nesterov().weight_decay(1e-6).make(); 
 
-   float running_loss = 100;
+   auto forward = [&](Variable x) {
+     for (auto layer : *convolutions) x = layer->forward({x})[0].clamp_min(0);
+
+     x = x.squeeze();
+     x = at::log_softmax(linear->forward({x})[0], 1);
+     return x;
+   };
+
+   float running_loss = 3;
    int epoch = 0;
-   auto bs = 128U;
-   auto W = Var(at::CPU(at::kFloat).randn({28 * 28, 10}), true);
-   for (auto epoch = 0U; epoch < 100; epoch++) {
+   auto bs = 256U;
+   for (auto epoch = 0U; epoch < 3; epoch++) {
      auto shuffled_inds = std::vector<int>(trdata.size(0));
      for (int i=0; i < trdata.size(0); i++) {
       shuffled_inds[i] = i;
@@ -309,42 +316,45 @@ std::unordered_map<std::string, void (*)()> constuct_tests() {
 
      auto inp = at::CPU(at::kFloat).tensor({bs, 1, trdata.size(2), trdata.size(3)});
      auto lab = at::CPU(at::kLong).tensor({bs});
-     for (auto p = 0U; p < shuffled_inds.size() - 128; p++) {
-       inp[p % 128] = trdata[shuffled_inds[p]];
-       lab[p % 128] = trlabel[shuffled_inds[p]];
+     for (auto p = 0U; p < shuffled_inds.size() - bs; p++) {
+       inp[p % bs] = trdata[shuffled_inds[p]];
+       lab[p % bs] = trlabel[shuffled_inds[p]];
 
-       if (p % 128 != 127) continue;
-       Variable x = Var(inp);
-       /*
-       auto y = Var(lab, false);
-       for (auto layer : *convolutions) x = layer->forward({x})[0].clamp_min(0);
-
-       x = x.squeeze();
-       x = at::log_softmax(linear->forward({x})[0], 1);
+       if (p % bs != bs - 1) continue;
+       Variable x = forward(Var(inp));
+       Variable y = Var(lab, false);
        Variable loss = at::nll_loss(x, y);
-       */
-       Variable loss = x.view({x.size(0), -1}).mm(W).sum();
 
-       //optim->zero_grad();
+       optim->zero_grad();
        backward(loss);
-       //optim->step(); 
+       optim->step(); 
 
-       running_loss = running_loss * 0.99 + loss.data().sum().toCFloat() * 0.01;
-       std::cout << running_loss << "\n";
+       auto print_freq = 10;
+       if (p % (bs * 10) == bs * 10 - 1) {
+         running_loss = running_loss * 0.99 + loss.data().sum().toCFloat() * 0.01;
+         std::cout << p << ": " << running_loss << "\n";
+       }
      }
    }
+
+   auto result = std::get<1>(forward(Var(tedata, false, true)).max(1));
+   auto correct = (result == telabel).sum().toCFloat();
+   std::cout << "Num correct: " << correct << std::endl;
+   
  };
 
  return tests;
 }
 
 int main(int argc, char** argv) {
+  /*
   auto W = Var(at::CPU(at::kFloat).randn({10, 10}), true);
   auto x = Var(at::CPU(at::kFloat).randn({5, 10}), true);
   Variable z = x.mm(W);
   backward(z);
+  */
   
-  //constuct_tests()["autograd/integration/mnist"]();
+  constuct_tests()["autograd/integration/mnist"]();
   /*
   for (auto p : constuct_tests()) {
     if (argc == 1) {

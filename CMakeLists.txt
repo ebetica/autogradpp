@@ -28,6 +28,7 @@ INCLUDE_DIRECTORIES(pytorch)
 
 FILE(GLOB SRCS *.cpp)
 ADD_LIBRARY(autogradpp STATIC ${SRCS})
+ADD_EXECUTABLE(autograd_test test.cpp)
 
 ADD_CUSTOM_COMMAND(
   TARGET autogradpp PRE_BUILD
@@ -41,6 +42,10 @@ ADD_CUSTOM_COMMAND(
   TARGET autogradpp PRE_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/pytorch/build/lib*/torch/_nvrtc.*.so" "${CMAKE_BINARY_DIR}/libpythpp_nvrtc.so"
 )
+ADD_CUSTOM_COMMAND(
+  TARGET autograd_test PRE_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/mnist" "${CMAKE_BINARY_DIR}/mnist"
+)
 
 TARGET_LINK_LIBRARIES(autogradpp ATen ${PYTHON_LIBRARIES}
     "${CMAKE_BINARY_DIR}/libpythpp.so"
@@ -49,5 +54,4 @@ TARGET_LINK_LIBRARIES(autogradpp ATen ${PYTHON_LIBRARIES}
     cuda
     nvrtc 
     )
-ADD_EXECUTABLE(autograd_test test.cpp)
 TARGET_LINK_LIBRARIES(autograd_test autogradpp)
