@@ -25,6 +25,9 @@ SET_TARGET_PROPERTIES(ATen PROPERTIES
 
 ### CUDA
 FIND_PACKAGE(CUDA)
+IF(CUDA_FOUND)
+  ADD_DEFINITIONS(-DWITH_CUDA)
+ENDIF(CUDA_FOUND)
 
 ### autogradpp
 FIND_PACKAGE(PythonLibs REQUIRED)
@@ -43,21 +46,26 @@ ADD_CUSTOM_COMMAND(
   TARGET autogradpp PRE_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/pytorch/build/lib*/torch/_dl.*.so" "${CMAKE_BINARY_DIR}/libpythpp_dl.so"
 )
-ADD_CUSTOM_COMMAND(
-  TARGET autogradpp PRE_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/pytorch/build/lib*/torch/_nvrtc.*.so" "${CMAKE_BINARY_DIR}/libpythpp_nvrtc.so"
-)
+IF(CUDA_FOUND)
+  ADD_CUSTOM_COMMAND(
+    TARGET autogradpp PRE_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/pytorch/build/lib*/torch/_nvrtc.*.so" "${CMAKE_BINARY_DIR}/libpythpp_nvrtc.so"
+  )
+ENDIF(CUDA_FOUND)
 ADD_CUSTOM_COMMAND(
   TARGET autograd_test PRE_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/mnist" "${CMAKE_BINARY_DIR}/mnist"
 )
 
 TARGET_LINK_LIBRARIES(autogradpp ATen ${PYTHON_LIBRARIES}
-    "${CMAKE_BINARY_DIR}/libpythpp.so"
-    "${CMAKE_BINARY_DIR}/libpythpp_dl.so"
+  "${CMAKE_BINARY_DIR}/libpythpp.so"
+  "${CMAKE_BINARY_DIR}/libpythpp_dl.so"
+)
+IF(CUDA_FOUND)
+  TARGET_LINK_LIBRARIES(autogradpp
     "${CMAKE_BINARY_DIR}/libpythpp_nvrtc.so"
-    -L${CUDA_TOOLKIT_ROOT_DIR}/lib64
-    cuda
-    nvrtc 
-    )
+    -L${CUDA_TOOLKIT_ROOT_DIR}/lib64 cuda nvrtc
+   )
+ENDIF(CUDA_FOUND)
+
 TARGET_LINK_LIBRARIES(autograd_test autogradpp)
