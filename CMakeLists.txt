@@ -39,28 +39,40 @@ ADD_CUSTOM_COMMAND(
   TARGET autogradpp PRE_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/pytorch/build/lib*/torch/_C.*.so" "${CMAKE_BINARY_DIR}/libpythpp.so"
 )
-ADD_CUSTOM_COMMAND(
-  TARGET autogradpp PRE_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/pytorch/build/lib*/torch/_dl.*.so" "${CMAKE_BINARY_DIR}/libpythpp_dl.so"
-)
+IF(APPLE)
+  ADD_CUSTOM_COMMAND(
+    TARGET autogradpp PRE_BUILD
+    COMMAND install_name_tool -id "@rpath/libpythpp.so" -add_rpath "${CMAKE_BINARY_DIR}" "${CMAKE_BINARY_DIR}/libpythpp.so"
+  )
+ENDIF(APPLE)
+ADD_LIBRARY(libpythpp SHARED IMPORTED)
+SET_TARGET_PROPERTIES(libpythpp PROPERTIES
+  IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/libpythpp.so")
+
 IF(CUDA_FOUND)
   ADD_CUSTOM_COMMAND(
     TARGET autogradpp PRE_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/pytorch/build/lib*/torch/_nvrtc.*.so" "${CMAKE_BINARY_DIR}/libpythpp_nvrtc.so"
   )
+  IF(APPLE)
+    ADD_CUSTOM_COMMAND(
+      TARGET autogradpp PRE_BUILD
+      COMMAND install_name_tool -id "@rpath/libpythpp_nvrtc.so" -add_rpath "${CMAKE_BINARY_DIR}" "${CMAKE_BINARY_DIR}/libpythpp_nvrtc.so"
+    )
+  ENDIF(APPLE)
 ENDIF(CUDA_FOUND)
+ADD_LIBRARY(libpythpp_nvrtc SHARED IMPORTED)
+SET_TARGET_PROPERTIES(libpythpp_nvrtc PROPERTIES
+  IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/libpythpp_nvrtc.so")
+
 ADD_CUSTOM_COMMAND(
   TARGET autograd_test PRE_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/mnist" "${CMAKE_BINARY_DIR}/mnist"
 )
 
-TARGET_LINK_LIBRARIES(autogradpp ATen ${PYTHON_LIBRARIES}
-  "${CMAKE_BINARY_DIR}/libpythpp.so"
-  "${CMAKE_BINARY_DIR}/libpythpp_dl.so"
-)
+TARGET_LINK_LIBRARIES(autogradpp ATen ${PYTHON_LIBRARIES} libpythpp)
 IF(CUDA_FOUND)
-  TARGET_LINK_LIBRARIES(autogradpp
-    "${CMAKE_BINARY_DIR}/libpythpp_nvrtc.so"
+  TARGET_LINK_LIBRARIES(autogradpp libpythpp_nvrtc
     -L${CUDA_TOOLKIT_ROOT_DIR}/lib64 cuda nvrtc
    )
 ENDIF(CUDA_FOUND)
