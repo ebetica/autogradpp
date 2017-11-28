@@ -55,11 +55,9 @@ IF(APPLE)
     TARGET autogradpp PRE_BUILD
     COMMAND install_name_tool -id "@rpath/libpythpp.so" -add_rpath "${CMAKE_BINARY_DIR}" "${CMAKE_BINARY_DIR}/libpythpp.so"
   )
-  ADD_CUSTOM_COMMAND(
-    TARGET autograd_test POST_BUILD
-    DEPENDS "${CMAKE_BINARY_DIR}/autograd_test"
-    COMMAND install_name_tool -id "@rpath/libpythpp.so" -add_rpath "${CMAKE_BINARY_DIR}" "${CMAKE_BINARY_DIR}/autograd_test"
-  )
+  # Unfortunately this won't be picked up in the initial build...
+  SET_TARGET_PROPERTIES(libpythpp PROPERTIES
+    INTERFACE_LINK_LIBRARIES "-Wl,-rpath ${CMAKE_BINARY_DIR}")
 ENDIF(APPLE)
 
 ### Link stuff
