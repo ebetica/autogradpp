@@ -7,8 +7,7 @@ SET(CMAKE_POSITION_INDEPENDENT_CODE ON)
 SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake" "${CMAKE_SOURCE_DIR}/cmake/FindCUDA")
 
 ### This library exports: 
-FILE(GLOB SRCS *.cpp)
-ADD_LIBRARY(autogradpp STATIC ${SRCS})
+ADD_LIBRARY(autogradpp STATIC autograd.cpp)
 ADD_EXECUTABLE(autograd_test test.cpp)
 ADD_CUSTOM_COMMAND(
   TARGET autograd_test PRE_BUILD
