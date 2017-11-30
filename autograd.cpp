@@ -10,7 +10,7 @@ void backward(Variable loss, bool keep_graph) {
   tag::function_list funclst;
   funclst.emplace_back(loss.grad_fn(), loss.output_nr());
   // non-volatile gradients compute backward of backward
-  detail::engine.execute(funclst, {Var(at::ones_like(loss.data()), false, true)}, false);
+  detail::engine.execute(funclst, {Var(at::ones_like(loss.data()), false, true)}, keep_graph);
 }
 
 std::unordered_map<std::string, Variable> ContainerImpl::parameters() {

@@ -120,7 +120,7 @@ AUTOGRAD_CONTAINER_CLASS(SimpleContainer) {
 
 AUTOGRAD_CONTAINER_CLASS(Linear) {
  public:
-   Linear(uint32_t nin, uint32_t nout, bool no_bias=true)
+   Linear(uint32_t nin, uint32_t nout)
      : nin(nin), nout(nout) { }
 
    variable_list forward(variable_list) override;
