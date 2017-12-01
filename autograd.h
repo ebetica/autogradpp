@@ -5,8 +5,8 @@
 #include "torch/csrc/autograd/engine.h"
 #include "torch/csrc/autograd/variable.h"
 
-#define AUTOGRAD_CONTAINER_CLASS(Type) class Type : public Container_CRTP<Type>
-#define AUTOGRAD_OPTIMIZER_CLASS(Type) class Type : public Optimizer_CRTP<Type>
+#define AUTOGRAD_CONTAINER_CLASS(Type) class Type : public autograd::Container_CRTP<Type>
+#define AUTOGRAD_OPTIMIZER_CLASS(Type) class Type : public autograd::Optimizer_CRTP<Type>
 #define AUTOGRAD_KWARG(CLS, TYP, NAME, DEFAULT, OPTION) \
   TYP NAME ## _ = DEFAULT; \
   CLS & NAME(TYP x = OPTION) { NAME ## _ = x; return *this; }
@@ -23,10 +23,12 @@ extern tag::Engine engine;
 }
 
 class ContainerImpl;
+class OptimizerImpl;
 using Variable = tag::Variable;
 using variable_list = tag::variable_list;
 using Tensor = tag::Tensor;
 using Container = std::shared_ptr<ContainerImpl>;
+using Optimizer = std::shared_ptr<OptimizerImpl>;
 
 void backward(Variable loss, bool keep_graph=false);
 
