@@ -84,8 +84,7 @@ variable_list Linear::forward(variable_list input) {
     return variable_list({at::addmm(bias, x, weight.t())});
   }
 
-  assert(x.size(0) == weight.size(1));
-  auto output = x.mm(weight.t());
+  auto output = x.matmul(weight.t());
   if (!no_bias_) {
     output += bias;
   }
