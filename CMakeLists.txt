@@ -38,7 +38,7 @@ INCLUDE_DIRECTORIES(pytorch)
 ### Copy over all the relevant .so files
 ADD_CUSTOM_COMMAND(
   TARGET autogradpp PRE_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/pytorch/build/lib*/torch/_C.*.so" "${CMAKE_BINARY_DIR}/libpythpp.so"
+  COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/pytorch/build/lib*/torch/_C*.so" "${CMAKE_BINARY_DIR}/libpythpp.so"
 )
 ADD_LIBRARY(libpythpp SHARED IMPORTED)
 SET_TARGET_PROPERTIES(libpythpp PROPERTIES IMPORTED_NO_SONAME 1
@@ -69,7 +69,7 @@ IF(CUDA_FOUND)
 
   ADD_CUSTOM_COMMAND(
     TARGET autogradpp PRE_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/pytorch/build/lib*/torch/_nvrtc.*.so" "${CMAKE_BINARY_DIR}/libpythpp_nvrtc.so"
+    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/pytorch/build/lib*/torch/_nvrtc*.so" "${CMAKE_BINARY_DIR}/libpythpp_nvrtc.so"
   )
   IF(APPLE)
     ADD_CUSTOM_COMMAND(
