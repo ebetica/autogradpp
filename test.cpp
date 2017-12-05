@@ -8,6 +8,12 @@ using namespace autograd;
 #define STR(x) STR_HELPER(x)
 #define EXPECT(CODE) if (CODE); else { throw std::runtime_error(__FILE__ ":" STR(__LINE__) ": " #CODE); }
 
+#if AT_CUDA_ENABLED()
+#define CUDA_GUARD ""
+#else
+#define CUDA_GUARD std::cerr << "No cuda, skipping test" << std::endl; return
+#endif
+
 std::map<std::string, void (*)()> constuct_tests() {
  std::map<std::string, void (*)()> tests;
 
@@ -115,6 +121,7 @@ std::map<std::string, void (*)()> constuct_tests() {
  };
 
  tests["autograd/cuda/1"] = []() {
+   CUDA_GUARD;
    auto model = Linear(5, 2).make();
    model->cuda();
    auto x = Var(at::CUDA(at::kFloat).randn({10, 5}), true);
@@ -215,6 +222,7 @@ std::map<std::string, void (*)()> constuct_tests() {
 
 
  tests["autograd/~integration/mnist"] = []() {  // ~ will make it run last :D
+   CUDA_GUARD;
    std::cout << "Training MNST for 3 epochs, rest your eyes for a bit!\n";
    auto useGPU = true;
    struct MNIST_Reader
