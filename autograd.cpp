@@ -1,5 +1,7 @@
-#include "autograd.h"
+#include <fstream>
+#include <cereal/archives/binary.hpp>
 
+#include "autograd.h"
 
 namespace autograd {
 namespace detail {
@@ -13,7 +15,19 @@ void backward(Variable loss, bool keep_graph) {
   detail::engine.execute(funclst, {Var(at::ones_like(loss.data()), false, true)}, keep_graph);
 }
 
-std::unordered_map<std::string, Variable> ContainerImpl::parameters() {
+void save(std::string fn, Container const model) {
+  std::ofstream os(fn, std::ios::binary);
+  cereal::BinaryOutputArchive archive(os);
+  archive(*model);
+}
+
+void load(std::string fn, Container model) {
+  std::ifstream is(fn, std::ios::binary);
+  cereal::BinaryInputArchive archive(is);
+  archive(*model);
+}
+
+std::unordered_map<std::string, Variable> ContainerImpl::parameters() const {
   std::unordered_map<std::string, Variable> ret;
   for (auto pair : children_) {
     auto& name = pair.first;

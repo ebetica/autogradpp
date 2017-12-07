@@ -1,6 +1,9 @@
 #pragma once
 
 #include <memory>
+#include "cereal/types/vector.hpp"
+#include "cereal/types/unordered_map.hpp"
+#include "cereal/types/string.hpp"
 
 #include "torch/csrc/autograd/engine.h"
 #include "torch/csrc/autograd/variable.h"
@@ -10,6 +13,7 @@
 #define AUTOGRAD_KWARG(CLS, TYP, NAME, DEFAULT, OPTION) \
   TYP NAME ## _ = DEFAULT; \
   CLS & NAME(TYP x = OPTION) { NAME ## _ = x; return *this; }
+
 
 
 namespace {
@@ -31,6 +35,8 @@ using Container = std::shared_ptr<ContainerImpl>;
 using Optimizer = std::shared_ptr<OptimizerImpl>;
 
 void backward(Variable loss, bool keep_graph=false);
+void save(std::string fn, Container const model);
+void load(std::string fn, Container model);
 
 inline Variable Var(
     at::Tensor data, bool requires_grad=true, bool is_volatile=false) {
@@ -44,7 +50,7 @@ class ContainerImpl {
   virtual variable_list forward(variable_list) = 0;
   virtual void initialize_parameters() { };
 
-  std::unordered_map<std::string, Variable> parameters(); 
+  std::unordered_map<std::string, Variable> parameters() const; 
 
   void cuda();
   void train();
@@ -56,6 +62,49 @@ class ContainerImpl {
   std::unordered_map<std::string, Variable> params_;
   bool cuda_ = false;
   bool train_ = true;
+
+  template<class Archive>
+  void save(Archive&& ar) const {
+    std::unordered_map<std::string, std::vector<int64_t>> psizes;
+    std::unordered_map<std::string, std::vector<uint8_t>> pcopy;
+    std::unordered_map<std::string, int> psize;
+    for (auto p : parameters()) {
+      auto sizes = std::vector<std::size_t>();
+      for (auto s : p.second.sizes()) {
+        sizes.push_back(s);
+      }
+      auto buf = std::vector<uint8_t>();
+      auto tensor = p.second.contiguous();
+      auto size = tensor.storage()->size() * tensor.storage()->elementSize();
+
+      buf.resize(size);
+      memcpy(buf.data(), tensor.storage()->data(), size);
+      
+      pcopy.insert({p.first, std::move(buf)});
+      psize[p.first] = size;
+    }
+    ar(CEREAL_NVP(psizes), CEREAL_NVP(pcopy), CEREAL_NVP(psize));
+  }
+
+  template<class Archive>
+  void load(Archive&& ar) {
+    std::unordered_map<std::string, std::vector<int64_t>> psizes;
+    std::unordered_map<std::string, std::vector<uint8_t>> pcopy;
+    std::unordered_map<std::string, int> psize;
+    ar(CEREAL_NVP(psizes), CEREAL_NVP(pcopy), CEREAL_NVP(psize));
+    auto params = parameters();
+
+    for (auto& p : pcopy) {
+      auto& name = p.first;
+      auto& buf = p.second;
+      auto& sizes = psizes[name];
+      auto& bufsize = psize[name];
+
+      auto& tensor = params[name];
+      tensor.data().resize_(sizes);
+      memcpy(tensor.storage()->data(), buf.data(), bufsize);
+    }
+  }
 
  protected:
   Container add(Container, std::string const&);
