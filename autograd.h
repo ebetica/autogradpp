@@ -76,6 +76,7 @@ class ContainerImpl {
       }
       auto buf = std::vector<uint8_t>();
       auto tensor = p.second.contiguous();
+      tensor = tensor.toBackend(at::kCPU);
       auto size = tensor.storage()->size() * tensor.storage()->elementSize();
 
       buf.resize(size);
@@ -103,8 +104,16 @@ class ContainerImpl {
       auto& bufsize = psize[name];
 
       auto& tensor = params[name];
-      tensor.data().resize_(sizes);
-      memcpy(tensor.storage()->data(), buf.data(), bufsize);
+      if (tensor.type().is_cuda()) {
+        // should actually use cudamemcpy probably
+        auto cputensor = at::CPU(tensor.type().scalarType()).tensor(sizes);
+        tensor.data().resize_(sizes);
+        memcpy(cputensor.storage()->data(), buf.data(), bufsize);
+        tensor.copy_(cputensor);
+      } else {
+        tensor.data().resize_(sizes);
+        memcpy(tensor.storage()->data(), buf.data(), bufsize);
+      }
     }
   }
 
