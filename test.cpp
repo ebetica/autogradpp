@@ -158,13 +158,17 @@ std::map<std::string, void (*)()> constuct_tests() {
  tests["autograd/dropout/1"] = []() {
    auto dropout = Dropout(0.5).make();
    Variable x = Var(at::CPU(at::kFloat).ones(100));
-   x = dropout->forward({x})[0];
+   Variable y = dropout->forward({x})[0];
 
-   backward(x);
-   EXPECT(x.ndimension() == 1);
-   EXPECT(x.size(0) == 100);
-   EXPECT(x.data().sum().toCFloat() < 70); // Probably
-   EXPECT(x.data().sum().toCFloat() > 30); // Probably
+   backward(y);
+   EXPECT(y.ndimension() == 1);
+   EXPECT(y.size(0) == 100);
+   EXPECT(y.sum().toCFloat() < 130); // Probably
+   EXPECT(y.sum().toCFloat() > 70); // Probably
+
+   dropout->eval();
+   y = dropout->forward({x})[0];
+   EXPECT(y.data().sum().toCFloat() == 100);
  };
 
  tests["autograd/LSTM/1"] = []() {
