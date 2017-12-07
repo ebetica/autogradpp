@@ -69,7 +69,7 @@ class ContainerImpl {
     std::unordered_map<std::string, std::vector<uint8_t>> pcopy;
     std::unordered_map<std::string, int> psize;
     for (auto p : parameters()) {
-      auto sizes = std::vector<std::size_t>();
+      auto sizes = std::vector<int64_t>();
       for (auto s : p.second.sizes()) {
         sizes.push_back(s);
       }
@@ -82,6 +82,7 @@ class ContainerImpl {
       
       pcopy.insert({p.first, std::move(buf)});
       psize[p.first] = size;
+      psizes[p.first] = sizes;
     }
     ar(CEREAL_NVP(psizes), CEREAL_NVP(pcopy), CEREAL_NVP(psize));
   }

@@ -222,17 +222,13 @@ std::map<std::string, void (*)()> constuct_tests() {
 
  tests["autograd/serialization/xor"] = []() {
    // We better be able to save and load a XOR model!
-   auto model = ContainerList()
+   auto makeModel = []() {
+     return ContainerList()
      .append(Linear(2, 8).make())
      .append(Linear(8, 1).make())
      .make();
-   
-   auto optim = SGD(model, 1e-1).momentum(0.9).nesterov().weight_decay(1e-6).make(); 
-
-   float running_loss = 1;
-   int epoch = 0;
-   while (running_loss > 0.1) {
-     auto bs = 4U;
+   };
+   auto getLoss = [](std::shared_ptr<ContainerList> model, uint32_t bs) {
      auto inp = at::CPU(at::kFloat).tensor({bs, 2});
      auto lab = at::CPU(at::kFloat).tensor({bs});
      for (auto i = 0U; i < bs; i++) {
@@ -248,8 +244,18 @@ std::map<std::string, void (*)()> constuct_tests() {
      auto x = Var(inp);
      auto y = Var(lab, false);
      for (auto layer : *model) x = layer->forward({x})[0].sigmoid_();
-     Variable loss = at::binary_cross_entropy(x, y);
-      
+     return at::binary_cross_entropy(x, y);
+   };
+
+   auto model = makeModel();
+   auto model2 = makeModel();
+   auto model3 = makeModel();
+   auto optim = SGD(model, 1e-1).momentum(0.9).nesterov().weight_decay(1e-6).make(); 
+
+   float running_loss = 1;
+   int epoch = 0;
+   while (running_loss > 0.1) {
+     Variable loss = getLoss(model, 4);
      optim->zero_grad();
      backward(loss);
      optim->step(); 
@@ -260,28 +266,17 @@ std::map<std::string, void (*)()> constuct_tests() {
    }
    
    save("test.bin", model);
-
-   auto model2 = ContainerList()
-     .append(Linear(2, 8).make())
-     .append(Linear(8, 1).make())
-     .make();
-
    load("test.bin", model2);
-   auto bs = 100U;
-   auto inp = at::CPU(at::kFloat).tensor({bs, 2});
-   auto lab = at::CPU(at::kFloat).tensor({bs});
-   for (auto i = 0U; i < bs; i++) {
-     auto a = std::rand() % 2;
-     auto b = std::rand() % 2;
-     auto c = a ^ b;
-     inp[i][0] = a;
-     inp[i][1] = b;
-     lab[i] = c;
-   }
-   auto x = Var(inp);
-   auto y = Var(lab, false);
-   for (auto layer : *model) x = layer->forward({x})[0].sigmoid_();
-   Variable loss = at::binary_cross_entropy(x, y);
+
+   auto loss = getLoss(model2, 100);
+   EXPECT(loss.toCFloat() < 0.1);
+
+   CUDA_GUARD;
+   model2->cuda();
+   save("test.bin", model2);
+   load("test.bin", model3);
+
+   loss = getLoss(model3, 100);
    EXPECT(loss.toCFloat() < 0.1);
  };
 
