@@ -35,6 +35,7 @@ FIND_PACKAGE(PythonLibs REQUIRED)
 TARGET_INCLUDE_DIRECTORIES(autogradpp PUBLIC 
   ${PYTHON_INCLUDE_DIRS} 
   "${CMAKE_CURRENT_SOURCE_DIR}/pytorch"
+  "${CMAKE_CURRENT_SOURCE_DIR}"
 )
 
 ### Copy over all the relevant .so files
