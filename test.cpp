@@ -137,6 +137,24 @@ std::map<std::string, void (*)()> constuct_tests() {
    EXPECT(model->parameters()["weight"].grad().numel() == 2 * 5);
  };
 
+ tests["autograd/cuda/2"] = []() {
+   CUDA_GUARD;
+   auto model = Linear(5, 2).make();
+   model->cuda();
+   model->cpu();
+   auto x = Var(at::CPU(at::kFloat).randn({10, 5}), true);
+   auto y = model->forward({x})[0];
+   Variable s = y.sum();
+
+   backward(s);
+   EXPECT(y.ndimension() == 2);
+   EXPECT(s.ndimension() == 1);
+   EXPECT(y.size(0) == 10);
+   EXPECT(y.size(1) == 2);
+
+   EXPECT(model->parameters()["weight"].grad().numel() == 2 * 5);
+ };
+
  tests["autograd/dropout/1"] = []() {
    auto dropout = Dropout(0.5).make();
    Variable x = Var(at::CPU(at::kFloat).ones(100));

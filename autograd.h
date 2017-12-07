@@ -53,6 +53,7 @@ class ContainerImpl {
   std::unordered_map<std::string, Variable> parameters() const; 
 
   void cuda();
+  void cpu();
   void train();
   void eval();
 

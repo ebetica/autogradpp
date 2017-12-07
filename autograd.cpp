@@ -61,6 +61,19 @@ void ContainerImpl::cuda() {
   }
 };
 
+void ContainerImpl::cpu() {
+  for (auto& pair : children_) {
+    pair.second->cpu();
+  }
+  cuda_ = false;
+  // So we hack it...
+  auto copied = params_;
+  initialize_parameters();
+  for (auto pair : params_) {
+    pair.second.data().copy_(copied[pair.first].data());
+  }
+};
+
 void ContainerImpl::train() {
   for (auto& pair : children_) {
     pair.second->train();
