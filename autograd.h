@@ -348,4 +348,20 @@ AUTOGRAD_OPTIMIZER_CLASS(SGD) {
   std::unordered_map<std::string, at::Tensor> momentum_buffers;
 };
 
+AUTOGRAD_OPTIMIZER_CLASS(Adam) {
+ public:
+  Adam(Container model, double lr) : Optimizer_CRTP(model), lr_(lr) { }
+  AUTOGRAD_KWARG(Adam, double, momentum, 0, 0);
+  AUTOGRAD_KWARG(Adam, double, beta1, 0.9, 0.9);
+  AUTOGRAD_KWARG(Adam, double, beta2, 0.999, 0.999);
+  AUTOGRAD_KWARG(Adam, double, weight_decay, 0, 0);
+  AUTOGRAD_KWARG(Adam, double, eps, 1e-8, 1e-8);
+  void step() override;
+  
+  double lr_;
+  std::unordered_map<std::string, int> step_buffer;
+  std::unordered_map<std::string, at::Tensor> exp_avg_buffer;
+  std::unordered_map<std::string, at::Tensor> exp_avg_sq_buffer;
+};
+
 }  // namespace autograd
