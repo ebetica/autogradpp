@@ -1,4 +1,4 @@
-#include <math.h>
+#include <cmath>
 #include <fstream>
 #include <cereal/archives/binary.hpp>
 
@@ -281,7 +281,7 @@ void OptimizerImpl::zero_grad() {
 }
 
 void SGD::step() {
-  for (auto pair : model_->parameters()) {
+  for (auto& pair : model_->parameters()) {
     auto& name = pair.first;
     auto& grad = pair.second.grad();
     auto& p = pair.second.data();
@@ -312,7 +312,7 @@ void SGD::step() {
 }
 
 void Adam::step() {
-  for (auto pair : model_->parameters()) {
+  for (auto& pair : model_->parameters()) {
     auto& name = pair.first;
     auto& grad = pair.second.grad();
     auto& p = pair.second.data();

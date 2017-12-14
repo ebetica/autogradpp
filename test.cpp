@@ -16,6 +16,7 @@ using namespace autograd;
 #endif
 
 class CartPole {
+  // Translated from openai/gym's cartpole.py
   public:
     double gravity = 9.8;
     double masscart = 1.0;
@@ -59,7 +60,6 @@ class CartPole {
     }
 
     void step(int action) {
-      // Translated from openai/gym's cartpole.py
       auto x = state[0].toCFloat();
       auto x_dot = state[1].toCFloat();
       auto theta = state[2].toCFloat();
