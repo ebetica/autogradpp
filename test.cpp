@@ -1,4 +1,5 @@
 #include <map>
+#include <math.h>
 #include "autograd.h"
 using namespace autograd;
 
@@ -13,6 +14,93 @@ using namespace autograd;
 #else
 #define CUDA_GUARD std::cerr << "No cuda, skipping test" << std::endl; return
 #endif
+
+class CartPole {
+  // Translated from openai/gym's cartpole.py
+  public:
+    double gravity = 9.8;
+    double masscart = 1.0;
+    double masspole = 0.1;
+    double total_mass = (masspole + masscart);
+    double length = 0.5; // actually half the pole's length;
+    double polemass_length = (masspole * length);
+    double force_mag = 10.0;
+    double tau = 0.02;  // seconds between state updates;
+
+    // Angle at which to fail the episode
+    double theta_threshold_radians = 12 * 2 * M_PI / 360;
+    double x_threshold = 2.4;
+    int steps_beyond_done = -1;
+
+    at::Tensor state;
+    double reward;
+    bool done;
+    int step_ = 0;
+
+    at::Tensor getState() {
+      return state;
+    }
+
+    double getReward() {
+      return reward;
+    }
+
+    double isDone() {
+      return done;
+    }
+
+    void reset() {
+      state = at::CPU(at::kFloat).tensor({4}).uniform_(-0.05, 0.05);
+      steps_beyond_done = -1;
+      step_ = 0;
+    }
+
+    CartPole() {
+      reset();
+    }
+
+    void step(int action) {
+      auto x = state[0].toCFloat();
+      auto x_dot = state[1].toCFloat();
+      auto theta = state[2].toCFloat();
+      auto theta_dot = state[3].toCFloat();
+
+      auto force = (action == 1) ? force_mag : -force_mag;
+      auto costheta = std::cos(theta);
+      auto sintheta = std::sin(theta);
+      auto temp = (force + polemass_length * theta_dot * theta_dot * sintheta) / total_mass;
+      auto thetaacc = (gravity * sintheta - costheta* temp) / (length * (4.0/3.0 - masspole * costheta * costheta / total_mass));
+      auto xacc  = temp - polemass_length * thetaacc * costheta / total_mass;
+
+      x  = x + tau * x_dot;
+      x_dot = x_dot + tau * xacc;
+      theta = theta + tau * theta_dot;
+      theta_dot = theta_dot + tau * thetaacc;
+      state[0] = x;
+      state[1] = x_dot;
+      state[2] = theta;
+      state[3] = theta_dot;
+      done =  x < - x_threshold 
+           || x > x_threshold 
+           || theta < -theta_threshold_radians 
+           || theta > theta_threshold_radians
+           || step_ > 200;
+
+      if (!done) {
+        reward = 1.0;
+      } else if (steps_beyond_done == -1) {
+        // Pole just fell!
+        steps_beyond_done = 0;
+        reward = 0;
+      } else {
+        if (steps_beyond_done == 0) {
+          assert(false); // Can't do this
+        }
+      }
+      step_++;
+
+    };
+};
 
 std::map<std::string, void (*)()> constuct_tests() {
  std::map<std::string, void (*)()> tests;
@@ -394,7 +482,6 @@ std::map<std::string, void (*)()> constuct_tests() {
      return x;
    };
 
-   // float running_loss = 3;
    auto bs = 32U;
    for (auto epoch = 0U; epoch < 3; epoch++) {
      auto shuffled_inds = std::vector<int>(trdata.size(0));
@@ -417,14 +504,6 @@ std::map<std::string, void (*)()> constuct_tests() {
        optim->zero_grad();
        backward(loss);
        optim->step(); 
-
-       /*
-       auto print_freq = 100;
-       if (p % (bs * print_freq) == bs * print_freq - 1) {
-         running_loss = running_loss * 0.9 + loss.data().sum().toCFloat() * 0.1;
-         std::cout << p << ": " << running_loss << "\n";
-       }
-       */
      }
    }
 
@@ -434,6 +513,99 @@ std::map<std::string, void (*)()> constuct_tests() {
      << " out of " << telabel.size(0) << std::endl;
    EXPECT(correct.data().sum().toCFloat() > telabel.size(0) * 0.8);
    return;
+ };
+
+ tests["autograd/~integration/cartpole"] = []() {
+   std::cout << "Training episodic policy gradient with a critic for up to 3000"
+     " episodes, rest your eyes for a bit!\n";
+   auto model = SimpleContainer().make();
+   auto linear = model->add(Linear(4, 128).make(), "linear");
+   auto policyHead = model->add(Linear(128, 2).make(), "policy");
+   auto valueHead = model->add(Linear(128, 1).make(), "action");
+   auto optim = Adam(model, 1e-3).make();
+
+   std::vector<Variable> saved_log_probs;
+   std::vector<Variable> saved_values;
+   std::vector<float> rewards;
+
+   auto forward = [&](variable_list inp) {
+     auto x = linear->forward(inp)[0].clamp_min(0);
+     Variable actions = policyHead->forward({x})[0];
+     Variable value = valueHead->forward({x})[0];
+     return std::make_tuple(at::softmax(actions, -1), value);
+   };
+
+   auto selectAction = [&](at::Tensor state) {
+     // Only work on single state right now, change index to gather for batch
+     auto out = forward({Var(state, false)});
+     auto probs = Variable(std::get<0>(out));
+     auto value = Variable(std::get<1>(out));
+     auto action = probs.data().multinomial(1)[0].toCInt();
+     // Compute the log prob of a multinomial distribution. 
+     // This should probably be actually implemented in autogradpp...
+     auto p = probs / probs.sum(-1, true);
+     auto log_prob = p[action].log();
+     saved_log_probs.push_back(log_prob);
+     saved_values.push_back(value);
+     return action;
+   };
+
+   auto finishEpisode = [&]() {
+     auto R = 0.;
+     for (int i = rewards.size() - 1; i >= 0; i--) {
+       R = rewards[i] + 0.99 * R;
+       rewards[i] = R;
+     }
+     auto r_t = at::CPU(at::kFloat).tensorFromBlob(rewards.data(), {static_cast<int64_t>(rewards.size())});
+     r_t = (r_t - r_t.mean()) / (r_t.std() + 1e-5);
+
+     std::vector<at::Tensor> policy_loss;
+     std::vector<at::Tensor> value_loss;
+     for (auto i = 0U; i < saved_log_probs.size(); i++) {
+       auto r = rewards[i] - saved_values[i].toCFloat();
+       policy_loss.push_back(- r * saved_log_probs[i]);
+       value_loss.push_back(at::smooth_l1_loss(saved_values[i], Var(at::CPU(at::kFloat).scalarTensor(at::Scalar(rewards[i])), false)));
+     }
+     auto loss = at::cat(policy_loss).sum() + at::cat(value_loss).sum();
+
+     optim->zero_grad();
+     backward(loss);
+     optim->step();
+
+     rewards.clear();
+     saved_log_probs.clear();
+     saved_values.clear();
+   };
+
+   auto env = CartPole();
+   double running_reward = 10.0;
+   for (auto episode = 0; ; episode++) {
+     env.reset();
+     auto state = env.getState();
+     int t = 0;
+     for ( ; t < 10000; t++) {
+       auto action = selectAction(state);
+       env.step(action);
+       state = env.getState();
+       auto reward = env.getReward();
+       auto done = env.isDone();
+
+       rewards.push_back(reward);
+       if (done) break;
+     }
+
+     running_reward = running_reward * 0.99 + t * 0.01;
+     finishEpisode();
+     /*
+     if (episode % 10 == 0) {
+       printf("Episode %i\tLast length: %5d\tAverage length: %.2f\n",
+               episode, t, running_reward);
+     }
+     */
+     if (running_reward > 150) break;
+     EXPECT(episode < 3000);
+   }
+
  };
 
  return tests;

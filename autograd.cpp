@@ -1,3 +1,4 @@
+#include <cmath>
 #include <fstream>
 #include <cereal/archives/binary.hpp>
 
@@ -280,7 +281,7 @@ void OptimizerImpl::zero_grad() {
 }
 
 void SGD::step() {
-  for (auto pair : model_->parameters()) {
+  for (auto& pair : model_->parameters()) {
     auto& name = pair.first;
     auto& grad = pair.second.grad();
     auto& p = pair.second.data();
@@ -307,6 +308,42 @@ void SGD::step() {
     }
 
     p.add_(d_p, - lr_);
+  }
+}
+
+void Adam::step() {
+  for (auto& pair : model_->parameters()) {
+    auto& name = pair.first;
+    auto& grad = pair.second.grad();
+    auto& p = pair.second.data();
+    if (!grad.defined()) continue;
+
+    if (step_buffer.find(name) == step_buffer.end()) {
+      step_buffer[name] = 0;
+      exp_avg_buffer[name] = at::zeros_like(p);
+      exp_avg_sq_buffer[name] = at::zeros_like(p);
+    }
+
+    auto& step = step_buffer[name];
+    auto& exp_avg = exp_avg_buffer[name];
+    auto& exp_avg_sq = exp_avg_sq_buffer[name];
+
+    step += 1;
+
+    auto d_p = grad.data();
+    if (weight_decay_ > 0) {
+      d_p.add_(p, weight_decay_);
+    }
+
+     exp_avg.mul_(beta1_).add_(d_p, 1 - beta1_);
+     exp_avg_sq.mul_(beta2_).addcmul_(d_p, d_p, 1 - beta2_);
+
+     auto denom = exp_avg_sq.sqrt().add_(eps_);
+     auto bias_correction1 = 1 - std::pow(beta1_, step);
+     auto bias_correction2 = 1 - std::pow(beta2_, step);
+     auto step_size = lr_ * std::sqrt(bias_correction2) / bias_correction1;
+
+     p.addcdiv_(exp_avg, denom, -step_size);
   }
 }
 
