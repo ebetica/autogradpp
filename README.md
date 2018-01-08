@@ -42,9 +42,7 @@ AUTOGRAD_CONTAINER_CLASS(MyModel) {
 ```
 
 Some things are not implemented:
-- CUDNN is waiting for [this massive PR](https://github.com/pytorch/pytorch/pull/3666) and more work on the PyTorch end to port it to C++
-- Lookuptables are not implemented. Even if they are sparse will be some work to get working
-- No Batchnorm but this is pretty easy.
-- Only SGD is implemented and the rest of the optimizers are just copying Python code from PyTorch over.
+- Batchnorm
+- Only SGD and Adam are implemented: the rest of the optimizers are just copying Python code from PyTorch over.
 
-Otherwise, everything else works. There may be breaking API changes as I make it easier to write models.
+Otherwise, everything else works. There may be breaking API changes.
