@@ -7,6 +7,7 @@
 
 #include "torch/csrc/autograd/engine.h"
 #include "torch/csrc/autograd/variable.h"
+#include "torch/csrc/autograd/grad_mode.h"
 
 #define AUTOGRAD_CONTAINER_CLASS(Type) class Type : public autograd::Container_CRTP<Type>
 #define AUTOGRAD_OPTIMIZER_CLASS(Type) class Type : public autograd::Optimizer_CRTP<Type>
@@ -38,10 +39,26 @@ void backward(Variable loss, bool keep_graph=false);
 void save(std::string fn, Container const model);
 void load(std::string fn, Container model);
 
-inline Variable Var(
-    at::Tensor data, bool requires_grad=true, bool is_volatile=false) {
-  return tag::make_variable(data, {requires_grad, is_volatile});
+inline Variable Var(at::Tensor data, bool requires_grad=true) {
+  return tag::make_variable(data, requires_grad);
 }
+
+// This is thread local!!!
+inline void set_grad_enabled(bool val=true) {
+  tag::GradMode::set_enabled(val);
+}
+
+// RAII thread local lock that stops future execution from building gradients
+class no_grad {
+ public:
+  no_grad() {
+    tag::GradMode::set_enabled(false);
+  }
+
+  ~no_grad() {
+    tag::GradMode::set_enabled(true);
+  }
+};
 
 class ContainerImpl {
  public: 
@@ -200,9 +217,9 @@ AUTOGRAD_CONTAINER_CLASS(Conv) {
     : Nd_(Nd),
       in_channels_(in_chan),
       out_channels_(out_chan),
-      stride_(makeTup(1)),
+      stride_(makeTup(1, 1)),
       padding_(makeTup(0)),
-      dilation_(makeTup(1)),
+      dilation_(makeTup(1, 1)),
       dilated_(false),
       output_padding_(makeTup(0))
       { }

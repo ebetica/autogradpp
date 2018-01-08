@@ -11,9 +11,11 @@ tag::Engine engine;
 
 void backward(Variable loss, bool keep_graph) {
   tag::function_list funclst;
+  tag::variable_list varlst;
   funclst.emplace_back(loss.grad_fn(), loss.output_nr());
-  // non-volatile gradients compute backward of backward
-  detail::engine.execute(funclst, {Var(at::ones_like(loss.data()), false, true)}, keep_graph);
+  varlst.emplace_back(Var(at::ones_like(loss.data()), false));
+  // create_graph should be set to true when we want to support double bwd
+  detail::engine.execute(funclst, varlst, keep_graph, false);
 }
 
 void save(std::string fn, Container const model) {
@@ -181,12 +183,11 @@ variable_list Conv::forward(variable_list input) {
 
   Variable out;
   if (transposed_) {
-    out = at::conv_transpose2d(x, weight, ks_, bias, stride_, padding_, output_padding_, dilation_);
-  } else if (dilated_) {
-    out = at::conv_dilated2d(x, weight, ks_, bias, stride_, padding_, dilation_);
+    out = at::conv_transpose2d(x, weight, bias, stride_, padding_, output_padding_, 1, dilation_);
   } else {
-    out = at::conv2d(x, weight, ks_, bias, stride_, padding_);
+    out = at::conv2d(x, weight, bias, stride_, padding_, dilation_);
   }
+
   return variable_list({out});
 }
 
