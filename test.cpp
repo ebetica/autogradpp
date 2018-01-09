@@ -1,4 +1,5 @@
 #include <map>
+#include <regex>
 #include <math.h>
 #include "autograd.h"
 using namespace autograd;
@@ -10,7 +11,7 @@ using namespace autograd;
 #define EXPECT(CODE) if (CODE); else { throw std::runtime_error(__FILE__ ":" STR(__LINE__) ": " #CODE); }
 
 #if AT_CUDA_ENABLED()
-#define CUDA_GUARD ""
+#define CUDA_GUARD 
 #else
 #define CUDA_GUARD std::cerr << "No cuda, skipping test" << std::endl; return
 #endif
@@ -105,9 +106,18 @@ class CartPole {
 std::map<std::string, void (*)()> constuct_tests() {
  std::map<std::string, void (*)()> tests;
 
+ tests["autograd/no_grad/1"] = []() {
+   no_grad_guard guard;
+   auto model = Linear(5, 2).make();
+   auto x = Var(at::CPU(at::kFloat).randn({10, 5}), true);
+   auto y = model->forward({x})[0];
+   Variable s = y.sum();
+
+   backward(s);
+   EXPECT(!model->parameters()["weight"].grad().defined());
+ };
+
  tests["autograd/conv2d/even"] = []() {
-    at::CPU(at::kFloat).randn({2, 3, 5, 5}).size(0);
-    Var(at::CPU(at::kFloat).randn({2, 3, 5, 5}), true).size(0);
     auto model = Conv2d(3, 2, 3).stride(2).make();
     auto x = Var(at::CPU(at::kFloat).randn({2, 3, 5, 5}), true);
     auto y = model->forward({x})[0];
@@ -507,7 +517,8 @@ std::map<std::string, void (*)()> constuct_tests() {
      }
    }
 
-   auto result = std::get<1>(forward(Var(tedata, false, true)).max(1));
+   no_grad_guard guard;
+   auto result = std::get<1>(forward(Var(tedata, false)).max(1));
    Variable correct = (result == Var(telabel)).toType(at::kFloat);
    std::cout << "Num correct: " << correct.data().sum().toCFloat() 
      << " out of " << telabel.size(0) << std::endl;
@@ -617,6 +628,8 @@ int main(int argc, char** argv) {
       std::cout << "Doing " << p.first << "\n";
       p.second();
     } else {
+      auto regex = std::regex(argv[1]);
+      if (!std::regex_search(p.first, regex)) continue;
       try {
         std::cout << "Doing " << p.first << "\n";
         p.second();
