@@ -107,7 +107,7 @@ std::map<std::string, void (*)()> constuct_tests() {
  std::map<std::string, void (*)()> tests;
 
  tests["autograd/no_grad/1"] = []() {
-   no_grad grad_lock;  // ag::no_grad;
+   no_grad_guard guard;
    auto model = Linear(5, 2).make();
    auto x = Var(at::CPU(at::kFloat).randn({10, 5}), true);
    auto y = model->forward({x})[0];
@@ -517,7 +517,7 @@ std::map<std::string, void (*)()> constuct_tests() {
      }
    }
 
-   no_grad grad_lock;
+   no_grad_guard guard;
    auto result = std::get<1>(forward(Var(tedata, false)).max(1));
    Variable correct = (result == Var(telabel)).toType(at::kFloat);
    std::cout << "Num correct: " << correct.data().sum().toCFloat() 

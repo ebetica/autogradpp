@@ -49,13 +49,13 @@ inline void set_grad_enabled(bool val=true) {
 }
 
 // RAII thread local lock that stops future execution from building gradients
-class no_grad {
+class no_grad_guard {
  public:
-  no_grad() {
+  no_grad_guard() {
     tag::GradMode::set_enabled(false);
   }
 
-  ~no_grad() {
+  ~no_grad_guard() {
     tag::GradMode::set_enabled(true);
   }
 };
