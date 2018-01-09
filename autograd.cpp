@@ -30,8 +30,8 @@ void load(std::string fn, Container model) {
   archive(*model);
 }
 
-std::unordered_map<std::string, Variable> ContainerImpl::parameters() const {
-  std::unordered_map<std::string, Variable> ret;
+std::map<std::string, Variable> ContainerImpl::parameters() const {
+  std::map<std::string, Variable> ret;
   for (auto pair : children_) {
     auto& name = pair.first;
     auto& child = pair.second;
