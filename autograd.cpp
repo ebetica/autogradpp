@@ -30,22 +30,7 @@ void load(std::string fn, Container model) {
   archive(*model);
 }
 
-std::unordered_map<std::string, Variable> ContainerImpl::parameters() const {
-  std::unordered_map<std::string, Variable> ret;
-  for (auto pair : children_) {
-    auto& name = pair.first;
-    auto& child = pair.second;
-    for (auto p : child->parameters()) {
-      ret[name + "/" + p.first] = p.second;
-    }
-  }
-  for (auto pair : params_) {
-    ret[pair.first] = pair.second;
-  }
-  return ret;
-}
-
-std::map<std::string, Variable> ContainerImpl::ordered_parameters() const {
+std::map<std::string, Variable> ContainerImpl::parameters() const {
   std::map<std::string, Variable> ret;
   for (auto pair : children_) {
     auto& name = pair.first;

@@ -68,8 +68,7 @@ class ContainerImpl {
   virtual variable_list forward(variable_list) = 0;
   virtual void initialize_parameters() { };
 
-  std::unordered_map<std::string, Variable> parameters() const; 
-  std::map<std::string, Variable> ordered_parameters() const; 
+  std::map<std::string, Variable> parameters() const; 
 
   void cuda();
   void cpu();
