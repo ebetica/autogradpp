@@ -10,7 +10,7 @@ git submodule update --init --recursive
 cd pytorch
 # On Linux:
 python setup.py build
-# On macOS (prefix with `MACOSX_DEPLOYMENT_TARGET=10.9 CC=clang CXX=clang++` when using anaconda)
+# On macOS (may need to prefix with `MACOSX_DEPLOYMENT_TARGET=10.9 CC=clang CXX=clang++` when using anaconda)
 LDSHARED="cc -dynamiclib -undefined dynamic_lookup" python setup.py build
 
 cd ..; mkdir -p build; cd build
