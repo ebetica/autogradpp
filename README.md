@@ -7,11 +7,11 @@ How to build:
 ```
 git submodule update --init --recursive
 
+cd pytorch
 # On Linux:
-cd pytorch; python setup.py build;
-
-# On macOS
-cd pytorch; LDSHARED="cc -dynamiclib -undefined dynamic_lookup" python setup.py build;
+python setup.py build
+# On macOS (may need to prefix with `MACOSX_DEPLOYMENT_TARGET=10.9 CC=clang CXX=clang++` when using anaconda)
+LDSHARED="cc -dynamiclib -undefined dynamic_lookup" python setup.py build
 
 cd ..; mkdir -p build; cd build
 cmake .. -DPYTHON_EXECUTABLE:FILEPATH=$(which python)  # helpful if you use anaconda
