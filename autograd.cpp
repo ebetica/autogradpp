@@ -18,6 +18,11 @@ void backward(Variable loss, bool keep_graph) {
   detail::engine.execute(funclst, varlst, keep_graph, false);
 }
 
+void backward(Tensor loss, bool keep_graph) {
+  Variable tmp(loss);
+  backward(tmp, keep_graph);
+}
+
 void save(std::string fn, Container const model) {
   std::ofstream os(fn, std::ios::binary);
   cereal::BinaryOutputArchive archive(os);
