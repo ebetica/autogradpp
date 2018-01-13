@@ -37,6 +37,7 @@ using Container = std::shared_ptr<ContainerImpl>;
 using Optimizer = std::shared_ptr<OptimizerImpl>;
 
 void backward(Variable loss, bool keep_graph=false);
+void backward(Tensor loss, bool keep_graph=false);
 void save(std::string fn, Container const model);
 void load(std::string fn, Container model);
 
