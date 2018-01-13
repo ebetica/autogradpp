@@ -165,6 +165,23 @@ std::map<std::string, void (*)()> constuct_tests() {
     EXPECT(model->parameters()["weight"].grad().numel() == 3 * 2 * 3);
   };
 
+ tests["autograd/conv3d/even"] = []() {
+    auto model = Conv3d(3, 2, 3).stride(2).make();
+    auto x = Var(at::CPU(at::kFloat).randn({2, 3, 5, 5, 5}), true);
+    auto y = model->forward({x})[0];
+    Variable s = y.sum();
+
+    backward(s);
+    EXPECT(y.ndimension() == 5);
+    EXPECT(s.ndimension() == 1);
+    for (auto i = 0; i < 5; i++) {
+      EXPECT(y.size(i) == 2);
+    }
+
+    EXPECT(model->parameters()["weight"].grad().numel() == 3 * 2 * 3 * 3 * 3);
+  };
+
+
  tests["autograd/linear/basic1"] = []() {
    auto model = Linear(5, 2).make();
    auto x = Var(at::CPU(at::kFloat).randn({10, 5}), true);

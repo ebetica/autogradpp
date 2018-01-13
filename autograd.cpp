@@ -179,18 +179,28 @@ variable_list Conv::forward(variable_list input) {
   auto x = input[0];
   if (Nd_ == 1) {
     assert(x.ndimension() == 3);
-    x = x.unsqueeze(-1);
+    x = x.unsqueeze(-1);  // TODO: Use conv1d once available
   } else if (Nd_ == 2) {
     assert(x.ndimension() == 4);
+  } else if (Nd_ == 3) {
+    assert(x.ndimension() == 5);
   } else {
-    throw std::runtime_error("Only Conv1d and Conv2d are supported");
+    throw std::runtime_error("Only Conv{1,2,3}d are supported");
   }
 
   Variable out;
-  if (transposed_) {
-    out = at::conv_transpose2d(x, weight, bias, stride_, padding_, output_padding_, 1, dilation_);
-  } else {
-    out = at::conv2d(x, weight, bias, stride_, padding_, dilation_);
+  if (Nd_ == 1 || Nd_ == 2) {
+    if (transposed_) {
+      out = at::conv_transpose2d(x, weight, bias, stride_, padding_, output_padding_, 1, dilation_);
+    } else {
+      out = at::conv2d(x, weight, bias, stride_, padding_, dilation_);
+    }
+  } else if (Nd_ == 3) {
+    if (transposed_) {
+      out = at::conv_transpose3d(x, weight, bias, stride_, padding_, output_padding_, 1, dilation_);
+    } else {
+      out = at::conv3d(x, weight, bias, stride_, padding_, dilation_);
+    }
   }
 
   return variable_list({out});

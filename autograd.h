@@ -280,17 +280,24 @@ AUTOGRAD_CONTAINER_CLASS(Conv) {
    }
 };
 
+class Conv1d : public Conv {
+ public:
+  Conv1d(uint32_t i, uint32_t o, int ks) : Conv(1, i, o, ks) { } 
+  Conv1d(uint32_t i, uint32_t o, IntVec ks) : Conv(1, i, o, ks) { }
+};
+
 class Conv2d : public Conv {
  public:
   Conv2d(uint32_t i, uint32_t o, int ks) : Conv(2, i, o, ks) { } 
   Conv2d(uint32_t i, uint32_t o, IntVec ks) : Conv(2, i, o, ks) { }
 };
 
-class Conv1d : public Conv {
+class Conv3d : public Conv {
  public:
-  Conv1d(uint32_t i, uint32_t o, int ks) : Conv(1, i, o, ks) { } 
-  Conv1d(uint32_t i, uint32_t o, IntVec ks) : Conv(1, i, o, ks) { }
+  Conv3d(uint32_t i, uint32_t o, int ks) : Conv(3, i, o, ks) { } 
+  Conv3d(uint32_t i, uint32_t o, IntVec ks) : Conv(3, i, o, ks) { }
 };
+
 
 AUTOGRAD_CONTAINER_CLASS(Dropout) {
  public:
