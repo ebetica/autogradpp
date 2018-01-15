@@ -213,6 +213,19 @@ AUTOGRAD_CONTAINER_CLASS(Linear) {
   uint32_t nin, nout;
 };
 
+AUTOGRAD_CONTAINER_CLASS(Embedding) {
+ public:
+   Embedding(uint32_t num_embeddings, uint32_t embedding_dim)
+     : num_embeddings(num_embeddings), embedding_dim(embedding_dim) { }
+
+   variable_list forward(variable_list) override;
+   void reset_parameters() override;
+   void initialize_parameters() override;
+
+  Variable weight;
+  uint32_t num_embeddings, embedding_dim;
+};
+
 AUTOGRAD_CONTAINER_CLASS(Conv) {
  private:
   Conv(uint32_t Nd, uint32_t in_chan, uint32_t out_chan) 

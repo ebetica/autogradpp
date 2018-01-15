@@ -235,6 +235,36 @@ std::map<std::string, void (*)()> constuct_tests() {
    EXPECT(x.data().min().toCFloat() == 0);
  };
 
+ tests["autograd/embedding/basic"] = []() {
+   int dict_size = 10;
+   auto model = Embedding(dict_size, 2).make();
+   // Cannot get gradients to change indices (input) - only for embedding params
+   auto x = Var(at::CPU(at::kLong).tensor({10}).fill_(dict_size - 1), false);
+   auto y = model->forward({x})[0];
+   Variable s = y.sum();
+
+   backward(s);
+   EXPECT(y.ndimension() == 2);
+   EXPECT(s.ndimension() == 1);
+   EXPECT(y.size(0) == 10);
+   EXPECT(y.size(1) == 2);
+
+   EXPECT(model->parameters()["weight"].grad().numel() == 2 * dict_size);
+ };
+
+ tests["autograd/embedding/list"] = []() {
+   auto model = Embedding(6, 4).make();
+   auto x = Var(at::CPU(at::kLong).tensor({2, 3}).fill_(5), false);
+   auto y = model->forward({x})[0];
+   Variable s = y.sum();
+
+   backward(s);
+   EXPECT(y.ndimension() == 3);
+   EXPECT(y.size(0) == 2);
+   EXPECT(y.size(1) == 3);
+   EXPECT(y.size(2) == 4);
+ };
+
  tests["autograd/cuda/1"] = []() {
    CUDA_GUARD;
    auto model = Linear(5, 2).make();
