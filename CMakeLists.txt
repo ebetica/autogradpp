@@ -59,7 +59,7 @@ IF(APPLE)
 ENDIF(APPLE)
 
 ### Link stuff
-TARGET_LINK_LIBRARIES(autogradpp ATen ${PYTHON_LIBRARIES} libpythpp)
+TARGET_LINK_LIBRARIES(autogradpp ATen libpythpp ${PYTHON_LIBRARIES})
 
 TARGET_LINK_LIBRARIES(autograd_test autogradpp)
 
