@@ -387,6 +387,20 @@ std::map<std::string, void (*)()> constuct_tests() {
    }
  };
 
+ tests["autograd/serialization/undefined"] = []() { 
+   auto x = at::Tensor();
+   
+   EXPECT(!x.defined());
+
+   auto y = at::CPU(at::kFloat).randn({5});
+
+   std::stringstream ss;
+   save(ss, &x);
+   load(ss, &y);
+
+   EXPECT(!y.defined());
+ };
+
  tests["autograd/serialization/xor"] = []() {
    // We better be able to save and load a XOR model!
    auto makeModel = []() {
@@ -432,16 +446,18 @@ std::map<std::string, void (*)()> constuct_tests() {
      epoch++;
    }
    
-   save("test.bin", model);
-   load("test.bin", model2);
+   std::stringstream ss;
+   save(ss, model);
+   load(ss, model2);
 
    auto loss = getLoss(model2, 100);
    EXPECT(loss.toCFloat() < 0.1);
 
    CUDA_GUARD;
    model2->cuda();
-   save("test.bin", model2);
-   load("test.bin", model3);
+   ss.clear();
+   save(ss, model2);
+   load(ss, model3);
 
    loss = getLoss(model3, 100);
    EXPECT(loss.toCFloat() < 0.1);

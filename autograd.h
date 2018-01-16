@@ -45,6 +45,7 @@ using Optimizer = std::shared_ptr<OptimizerImpl>;
 
 void backward(Tensor loss, bool keep_graph=false);
 
+// Some convenience functions for saving and loading
 template <typename T>
 void save(std::string const& fn, T const & obj) {
   std::ofstream os(fn, std::ios::binary);
@@ -62,6 +63,16 @@ void save(std::ostream& stream, T const & obj) {
 }
 template <typename T>
 void load(std::istream& stream, T& obj) {
+  cereal::BinaryInputArchive archive(stream);
+  archive(*obj);
+}
+template <typename T>
+void save(std::ostream& stream, T const * obj) {
+  cereal::BinaryOutputArchive archive(stream);
+  archive(*obj);
+}
+template <typename T>
+void load(std::istream& stream, T* obj) {
   cereal::BinaryInputArchive archive(stream);
   archive(*obj);
 }
@@ -430,6 +441,14 @@ CEREAL_REGISTER_POLYMORPHIC_RELATION(autograd::OptimizerImpl, autograd::Adam);
 namespace cereal {
 template<class Archive>
 void save(Archive & archive, at::Tensor const & tensor) { 
+  if (!tensor.defined()) {
+    auto type = at::ScalarType::Undefined;
+    archive(CEREAL_NVP(type));
+    return;
+  } else {
+    auto type = tensor.type().scalarType();
+    archive(CEREAL_NVP(type));
+  }
   auto sizes = std::vector<int64_t>();
   auto buf = std::vector<uint8_t>();
   for (auto s : tensor.sizes()) {
@@ -438,16 +457,11 @@ void save(Archive & archive, at::Tensor const & tensor) {
   auto contig = tensor.toBackend(at::kCPU).contiguous();
   auto size = tensor.storage()->size() * tensor.storage()->elementSize();
   at::Backend backend = tensor.type().backend();
-  at::ScalarType type = tensor.type().scalarType();
 
   buf.resize(size);
   memcpy(buf.data(), contig.storage()->data(), size);
 
-  archive(
-      CEREAL_NVP(type),
-      CEREAL_NVP(backend), 
-      CEREAL_NVP(sizes), 
-      CEREAL_NVP(buf)); 
+  archive(CEREAL_NVP(backend), CEREAL_NVP(sizes), CEREAL_NVP(buf)); 
 }
 
 /**
@@ -458,15 +472,17 @@ void save(Archive & archive, at::Tensor const & tensor) {
  **/
 template<class Archive>
 void load(Archive & archive, at::Tensor & tensor) {
+  at::ScalarType type;
+  archive(CEREAL_NVP(type));
+  if (type == at::ScalarType::Undefined) {
+    tensor = at::Tensor();
+    return;
+  }
+
+  at::Backend backend;
   auto sizes = std::vector<int64_t>();
   auto buf = std::vector<uint8_t>();
-  at::Backend backend;
-  at::ScalarType type;
-  archive(
-      CEREAL_NVP(type),
-      CEREAL_NVP(backend), 
-      CEREAL_NVP(sizes),
-      CEREAL_NVP(buf)); 
+  archive(CEREAL_NVP(backend), CEREAL_NVP(sizes), CEREAL_NVP(buf)); 
 
   if (!tensor.defined() || tensor.type().scalarType() != type) {
     tensor = at::getType(backend, type).tensor();
