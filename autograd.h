@@ -46,22 +46,22 @@ using Optimizer = std::shared_ptr<OptimizerImpl>;
 void backward(Tensor loss, bool keep_graph=false);
 
 template <typename T>
-void save(std::string const& fn, T const obj) {
+void save(std::string const& fn, T const & obj) {
   std::ofstream os(fn, std::ios::binary);
   save(os, obj);
 }
 template <typename T>
-void load(std::string const& fn, T obj) {
+void load(std::string const& fn, T& obj) {
   std::ifstream is(fn, std::ios::binary);
   load(is, obj);
 }
 template <typename T>
-void save(std::ostream& stream, T const obj) {
+void save(std::ostream& stream, T const & obj) {
   cereal::BinaryOutputArchive archive(stream);
   archive(*obj);
 }
 template <typename T>
-void load(std::istream& stream, T obj) {
+void load(std::istream& stream, T& obj) {
   cereal::BinaryInputArchive archive(stream);
   archive(*obj);
 }
