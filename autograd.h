@@ -47,16 +47,6 @@ void backward(Tensor loss, bool keep_graph=false);
 
 // Some convenience functions for saving and loading
 template <typename T>
-void save(std::string const& fn, T const & obj) {
-  std::ofstream os(fn, std::ios::binary);
-  save(os, obj);
-}
-template <typename T>
-void load(std::string const& fn, T& obj) {
-  std::ifstream is(fn, std::ios::binary);
-  load(is, obj);
-}
-template <typename T>
 void save(std::ostream& stream, T const & obj) {
   cereal::BinaryOutputArchive archive(stream);
   archive(*obj);
@@ -75,6 +65,16 @@ template <typename T>
 void load(std::istream& stream, T* obj) {
   cereal::BinaryInputArchive archive(stream);
   archive(*obj);
+}
+template <typename T>
+void save(std::string const& fn, T const & obj) {
+  std::ofstream os(fn, std::ios::binary);
+  autograd::save(os, obj);
+}
+template <typename T>
+void load(std::string const& fn, T& obj) {
+  std::ifstream is(fn, std::ios::binary);
+  autograd::load(is, obj);
 }
 
 inline Variable Var(at::Tensor data, bool requires_grad=true) {
@@ -135,7 +135,7 @@ class ContainerImpl {
     std::size_t size;
     ar(size);
     std::string name;
-    for (int i = 0; i < size; i++) {
+    for (std::size_t i = 0; i < size; i++) {
       ar(name);
       ar(params[name]);
     }
