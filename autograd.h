@@ -2,6 +2,14 @@
 
 #include <map>
 #include <memory>
+#include <fstream>
+
+// We have to include these to register optimizers
+#include "cereal/archives/binary.hpp"
+#include "cereal/archives/xml.hpp"
+#include "cereal/archives/json.hpp"
+#include "cereal/types/polymorphic.hpp"
+
 #include "cereal/types/vector.hpp"
 #include "cereal/types/unordered_map.hpp"
 #include "cereal/types/string.hpp"
@@ -15,7 +23,6 @@
 #define AUTOGRAD_KWARG(CLS, TYP, NAME, DEFAULT, OPTION) \
   TYP NAME ## _ = DEFAULT; \
   CLS & NAME(TYP x = OPTION) { NAME ## _ = x; return *this; }
-
 
 
 namespace {
@@ -36,10 +43,28 @@ using Tensor = tag::Tensor;
 using Container = std::shared_ptr<ContainerImpl>;
 using Optimizer = std::shared_ptr<OptimizerImpl>;
 
-void backward(Variable loss, bool keep_graph=false);
 void backward(Tensor loss, bool keep_graph=false);
-void save(std::string fn, Container const model);
-void load(std::string fn, Container model);
+
+template <typename T>
+void save(std::string const& fn, T const obj) {
+  std::ofstream os(fn, std::ios::binary);
+  save(os, obj);
+}
+template <typename T>
+void load(std::string const& fn, T obj) {
+  std::ifstream is(fn, std::ios::binary);
+  load(is, obj);
+}
+template <typename T>
+void save(std::ostream& stream, T const obj) {
+  cereal::BinaryOutputArchive archive(stream);
+  archive(*obj);
+}
+template <typename T>
+void load(std::istream& stream, T obj) {
+  cereal::BinaryInputArchive archive(stream);
+  archive(*obj);
+}
 
 inline Variable Var(at::Tensor data, bool requires_grad=true) {
   return tag::make_variable(data, requires_grad);
@@ -84,55 +109,24 @@ class ContainerImpl {
   bool train_ = true;
 
   template<class Archive>
-  void save(Archive&& ar) const {
-    std::unordered_map<std::string, std::vector<int64_t>> psizes;
-    std::unordered_map<std::string, std::vector<uint8_t>> pcopy;
-    std::unordered_map<std::string, int> psize;
-    for (auto p : parameters()) {
-      auto sizes = std::vector<int64_t>();
-      for (auto s : p.second.sizes()) {
-        sizes.push_back(s);
-      }
-      auto buf = std::vector<uint8_t>();
-      auto tensor = p.second.contiguous();
-      tensor = tensor.toBackend(at::kCPU);
-      auto size = tensor.storage()->size() * tensor.storage()->elementSize();
-
-      buf.resize(size);
-      memcpy(buf.data(), tensor.storage()->data(), size);
-      
-      pcopy.insert({p.first, std::move(buf)});
-      psize[p.first] = size;
-      psizes[p.first] = sizes;
+  void save(Archive & ar) const {
+    auto params = parameters();
+    std::size_t size = params.size();
+    ar(size);
+    for (auto& p : params) {
+      ar(p.first, p.second);
     }
-    ar(CEREAL_NVP(psizes), CEREAL_NVP(pcopy), CEREAL_NVP(psize));
   }
 
   template<class Archive>
-  void load(Archive&& ar) {
-    std::unordered_map<std::string, std::vector<int64_t>> psizes;
-    std::unordered_map<std::string, std::vector<uint8_t>> pcopy;
-    std::unordered_map<std::string, int> psize;
-    ar(CEREAL_NVP(psizes), CEREAL_NVP(pcopy), CEREAL_NVP(psize));
+  void load(Archive & ar) {
     auto params = parameters();
-
-    for (auto& p : pcopy) {
-      auto& name = p.first;
-      auto& buf = p.second;
-      auto& sizes = psizes[name];
-      auto& bufsize = psize[name];
-
-      auto& tensor = params[name];
-      if (tensor.type().is_cuda()) {
-        // should actually use cudamemcpy probably
-        auto cputensor = at::CPU(tensor.type().scalarType()).tensor(sizes);
-        tensor.data().resize_(sizes);
-        memcpy(cputensor.storage()->data(), buf.data(), bufsize);
-        tensor.copy_(cputensor);
-      } else {
-        tensor.data().resize_(sizes);
-        memcpy(tensor.storage()->data(), buf.data(), bufsize);
-      }
+    std::size_t size;
+    ar(size);
+    std::string name;
+    for (int i = 0; i < size; i++) {
+      ar(name);
+      ar(params[name]);
     }
   }
 
@@ -360,6 +354,7 @@ class OptimizerImpl {
   void zero_grad();
 
  protected:
+  OptimizerImpl() { }
   Container model_;
 };
 
@@ -372,6 +367,9 @@ class Optimizer_CRTP : public OptimizerImpl {
     ptr->init_state();
     return ptr;
   }
+ 
+ protected:
+  Optimizer_CRTP() { }
 };
 
 AUTOGRAD_OPTIMIZER_CLASS(SGD) {
@@ -382,24 +380,111 @@ AUTOGRAD_OPTIMIZER_CLASS(SGD) {
   AUTOGRAD_KWARG(SGD, double, weight_decay, 0, 0);
   AUTOGRAD_KWARG(SGD, bool, nesterov, false, true);
   void step() override;
+
+  template <class Archive>
+  void serialize(Archive & ar) { 
+    ar(CEREAL_NVP(momentum_buffers_)); 
+  }
   
+ private:
+  friend class cereal::access;
+  SGD() { }
   double lr_;
-  std::unordered_map<std::string, at::Tensor> momentum_buffers;
+  std::unordered_map<std::string, at::Tensor> momentum_buffers_;
 };
 
 AUTOGRAD_OPTIMIZER_CLASS(Adam) {
  public:
+  using OptimizerImpl::OptimizerImpl;
   Adam(Container model, double lr) : Optimizer_CRTP(model), lr_(lr) { }
   AUTOGRAD_KWARG(Adam, double, beta1, 0.9, 0.9);
   AUTOGRAD_KWARG(Adam, double, beta2, 0.999, 0.999);
   AUTOGRAD_KWARG(Adam, double, weight_decay, 0, 0);
   AUTOGRAD_KWARG(Adam, double, eps, 1e-8, 1e-8);
   void step() override;
+
+  template <class Archive>
+  void serialize(Archive & ar) { 
+    ar(CEREAL_NVP(step_buffer_),
+       CEREAL_NVP(exp_avg_buffer_),
+       CEREAL_NVP(exp_avg_sq_buffer_)); 
+  }
   
+ private:
+  friend class cereal::access;
+  Adam() { }
   double lr_;
-  std::unordered_map<std::string, int> step_buffer;
-  std::unordered_map<std::string, at::Tensor> exp_avg_buffer;
-  std::unordered_map<std::string, at::Tensor> exp_avg_sq_buffer;
+  std::unordered_map<std::string, int> step_buffer_;
+  std::unordered_map<std::string, at::Tensor> exp_avg_buffer_;
+  std::unordered_map<std::string, at::Tensor> exp_avg_sq_buffer_;
 };
 
 }  // namespace autograd
+
+// This is super ugly and I don't know how to simplify it
+CEREAL_REGISTER_TYPE(autograd::SGD);
+CEREAL_REGISTER_POLYMORPHIC_RELATION(autograd::OptimizerImpl, autograd::SGD);
+CEREAL_REGISTER_TYPE(autograd::Adam);
+CEREAL_REGISTER_POLYMORPHIC_RELATION(autograd::OptimizerImpl, autograd::Adam);
+
+namespace cereal {
+template<class Archive>
+void save(Archive & archive, at::Tensor const & tensor) { 
+  auto sizes = std::vector<int64_t>();
+  auto buf = std::vector<uint8_t>();
+  for (auto s : tensor.sizes()) {
+    sizes.push_back(s);
+  }
+  auto contig = tensor.toBackend(at::kCPU).contiguous();
+  auto size = tensor.storage()->size() * tensor.storage()->elementSize();
+  at::Backend backend = tensor.type().backend();
+  at::ScalarType type = tensor.type().scalarType();
+
+  buf.resize(size);
+  memcpy(buf.data(), contig.storage()->data(), size);
+
+  archive(
+      CEREAL_NVP(type),
+      CEREAL_NVP(backend), 
+      CEREAL_NVP(sizes), 
+      CEREAL_NVP(buf)); 
+}
+
+/**
+ * We follow these rules for loading:
+ * 1. If tensor is defined, and the same ScalarType as the saved tensor,
+ *    then we simply copy the data into the tensor, with resizing.
+ * 2. Otherwise, overwrite the provided tensor with the right type and backend
+ **/
+template<class Archive>
+void load(Archive & archive, at::Tensor & tensor) {
+  auto sizes = std::vector<int64_t>();
+  auto buf = std::vector<uint8_t>();
+  at::Backend backend;
+  at::ScalarType type;
+  archive(
+      CEREAL_NVP(type),
+      CEREAL_NVP(backend), 
+      CEREAL_NVP(sizes),
+      CEREAL_NVP(buf)); 
+
+  if (!tensor.defined() || tensor.type().scalarType() != type) {
+    tensor = at::getType(backend, type).tensor();
+  }
+  if (tensor.type().is_cuda()) {
+    // should actually use cudamemcpy probably
+    auto cputensor = at::CPU(tensor.type().scalarType()).tensor(sizes);
+    tensor.resize_(sizes);
+    memcpy(cputensor.storage()->data(), buf.data(), buf.size());
+    tensor.copy_(cputensor);
+  } else {
+    tensor.resize_(sizes);
+    memcpy(tensor.storage()->data(), buf.data(), buf.size());
+  }
+} 
+
+template<class Archive>
+void load(Archive & archive, tag::Variable & tensor) {
+  load(archive, tensor.data());
+} 
+}  // namespace cereal
