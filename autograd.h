@@ -364,6 +364,8 @@ class OptimizerImpl {
   virtual void step() = 0;
   void zero_grad();
 
+  void attach(Container model, bool clearState = true);
+
  protected:
   OptimizerImpl() { }
   Container model_;
@@ -391,6 +393,7 @@ AUTOGRAD_OPTIMIZER_CLASS(SGD) {
   AUTOGRAD_KWARG(SGD, double, weight_decay, 0, 0);
   AUTOGRAD_KWARG(SGD, bool, nesterov, false, true);
   void step() override;
+  void init_state() override;
 
   template <class Archive>
   void serialize(Archive & ar) { 
@@ -413,6 +416,7 @@ AUTOGRAD_OPTIMIZER_CLASS(Adam) {
   AUTOGRAD_KWARG(Adam, double, weight_decay, 0, 0);
   AUTOGRAD_KWARG(Adam, double, eps, 1e-8, 1e-8);
   void step() override;
+  void init_state() override;
 
   template <class Archive>
   void serialize(Archive & ar) { 

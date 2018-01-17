@@ -297,6 +297,13 @@ void OptimizerImpl::zero_grad() {
   }
 }
 
+void OptimizerImpl::attach(Container model, bool clearState) {
+  model_ = model;
+  if (clearState) {
+    this->init_state();
+  }
+}
+
 void SGD::step() {
   for (auto& pair : model_->parameters()) {
     auto& name = pair.first;
@@ -326,6 +333,10 @@ void SGD::step() {
 
     p.add_(d_p, - lr_);
   }
+}
+
+void SGD::init_state() {
+  momentum_buffers_.clear();
 }
 
 void Adam::step() {
@@ -362,6 +373,12 @@ void Adam::step() {
 
      p.addcdiv_(exp_avg, denom, -step_size);
   }
+}
+
+void Adam::init_state() {
+  step_buffer_.clear();
+  exp_avg_buffer_.clear();
+  exp_avg_sq_buffer_.clear();
 }
 
 }
