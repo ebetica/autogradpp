@@ -40,7 +40,7 @@ std::map<std::string, Variable> ContainerImpl::parameters() const {
   for (auto pair : children_) {
     auto& name = pair.first;
     auto& child = pair.second;
-    for (auto p : child->parameters()) {
+    for (auto& p : child->parameters()) {
       ret[name + "/" + p.first] = p.second;
     }
   }
