@@ -64,6 +64,7 @@ void ContainerImpl::cuda() {
   // So we hack it...
   auto copied = params_;
   initialize_parameters();
+  reset_parameters();
   for (auto pair : params_) {
     pair.second.data().copy_(copied[pair.first].data());
   }
@@ -77,6 +78,7 @@ void ContainerImpl::cpu() {
   // So we hack it...
   auto copied = params_;
   initialize_parameters();
+  reset_parameters();
   for (auto pair : params_) {
     pair.second.data().copy_(copied[pair.first].data());
   }
