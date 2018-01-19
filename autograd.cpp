@@ -145,7 +145,7 @@ void Conv::initialize_parameters() {
   if (!transposed_) {
     for (auto pad : output_padding_) {
       if (pad != 0) {
-        throw std::runtime_error("Only transposed convolutions support output padding!"); 
+        throw std::runtime_error("Only transposed convolutions support output padding!");
       }
     }
   }

@@ -11,7 +11,7 @@ using namespace autograd;
 #define EXPECT(CODE) if (CODE); else { throw std::runtime_error(__FILE__ ":" STR(__LINE__) ": " #CODE); }
 
 #if AT_CUDA_ENABLED()
-#define CUDA_GUARD 
+#define CUDA_GUARD
 #else
 #define CUDA_GUARD std::cerr << "No cuda, skipping test" << std::endl; return
 #endif
@@ -81,9 +81,9 @@ class CartPole {
       state[1] = x_dot;
       state[2] = theta;
       state[3] = theta_dot;
-      done =  x < - x_threshold 
-           || x > x_threshold 
-           || theta < -theta_threshold_radians 
+      done =  x < - x_threshold
+           || x > x_threshold
+           || theta < -theta_threshold_radians
            || theta > theta_threshold_radians
            || step_ > 200;
 
@@ -353,8 +353,8 @@ std::map<std::string, void (*)()> constuct_tests() {
      .append(Linear(2, 8).make())
      .append(Linear(8, 1).make())
      .make();
-   
-   auto optim = SGD(model, 1e-1).momentum(0.9).nesterov().weight_decay(1e-6).make(); 
+
+   auto optim = SGD(model, 1e-1).momentum(0.9).nesterov().weight_decay(1e-6).make();
 
    float running_loss = 1;
    int epoch = 0;
@@ -370,16 +370,16 @@ std::map<std::string, void (*)()> constuct_tests() {
        inp[i][1] = b;
        lab[i] = c;
      }
-     
+     //
      // forward
      auto x = Var(inp);
      auto y = Var(lab, false);
      for (auto layer : *model) x = layer->forward({x})[0].sigmoid_();
      Variable loss = at::binary_cross_entropy(x, y);
-      
+
      optim->zero_grad();
      backward(loss);
-     optim->step(); 
+     optim->step();
 
      running_loss = running_loss * 0.99 + loss.data().sum().toCFloat() * 0.01;
      EXPECT(epoch < 3000);
@@ -387,9 +387,9 @@ std::map<std::string, void (*)()> constuct_tests() {
    }
  };
 
- tests["autograd/serialization/undefined"] = []() { 
+ tests["autograd/serialization/undefined"] = []() {
    auto x = at::Tensor();
-   
+
    EXPECT(!x.defined());
 
    auto y = at::CPU(at::kFloat).randn({5});
@@ -420,7 +420,7 @@ std::map<std::string, void (*)()> constuct_tests() {
        inp[i][1] = b;
        lab[i] = c;
      }
-     
+
      // forward
      auto x = Var(inp);
      auto y = Var(lab, false);
@@ -431,7 +431,7 @@ std::map<std::string, void (*)()> constuct_tests() {
    auto model = makeModel();
    auto model2 = makeModel();
    auto model3 = makeModel();
-   auto optim = SGD(model, 1e-1).momentum(0.9).nesterov().weight_decay(1e-6).make(); 
+   auto optim = SGD(model, 1e-1).momentum(0.9).nesterov().weight_decay(1e-6).make();
 
    float running_loss = 1;
    int epoch = 0;
@@ -439,13 +439,13 @@ std::map<std::string, void (*)()> constuct_tests() {
      Variable loss = getLoss(model, 4);
      optim->zero_grad();
      backward(loss);
-     optim->step(); 
+     optim->step();
 
      running_loss = running_loss * 0.99 + loss.data().sum().toCFloat() * 0.01;
      EXPECT(epoch < 3000);
      epoch++;
    }
-   
+
    std::stringstream ss;
    save(ss, model);
    load(ss, model2);
@@ -476,11 +476,11 @@ std::map<std::string, void (*)()> constuct_tests() {
    load(ss, model3);
 
    // Make some optimizers with momentum (and thus state)
-   auto optim1 = SGD(model1, 1e-1).momentum(0.9).make(); 
-   auto optim2 = SGD(model2, 1e-1).momentum(0.9).make(); 
-   auto optim2_2 = SGD(model2, 1e-1).momentum(0.9).make(); 
-   auto optim3 = SGD(model3, 1e-1).momentum(0.9).make(); 
-   auto optim3_2 = SGD(model3, 1e-1).momentum(0.9).make(); 
+   auto optim1 = SGD(model1, 1e-1).momentum(0.9).make();
+   auto optim2 = SGD(model2, 1e-1).momentum(0.9).make();
+   auto optim2_2 = SGD(model2, 1e-1).momentum(0.9).make();
+   auto optim3 = SGD(model3, 1e-1).momentum(0.9).make();
+   auto optim3_2 = SGD(model3, 1e-1).momentum(0.9).make();
 
    auto x = Var(at::CPU(at::kFloat).ones({10, 5}), true);
 
@@ -498,7 +498,7 @@ std::map<std::string, void (*)()> constuct_tests() {
    // Do 2 steps of model 2 without saving the optimizer
    step(optim2, model2);
    step(optim2_2, model2);
-   
+
    // Do 2 steps of model 3 while saving the optimizer
    step(optim3, model3);
    ss.clear();
@@ -560,7 +560,7 @@ std::map<std::string, void (*)()> constuct_tests() {
        for (int i = 0; i < image_rows; i++)
          for (int j = 0; j < image_cols; j++) {
            a_data[c][0][i][j] = float(rd.read_byte()) / 255;
-     }     
+     }
 
      return data.toBackend(useGPU ? at::kCUDA : at::kCPU);
    };
@@ -592,8 +592,8 @@ std::map<std::string, void (*)()> constuct_tests() {
    auto linear1 = model->add(Linear(320, 50).make(), "linear1");
    auto linear2 = model->add(Linear(50, 10).make(), "linear2");
    if (useGPU) model->cuda();
-   
-   auto optim = SGD(model, 1e-2).momentum(0.5).make(); 
+
+   auto optim = SGD(model, 1e-2).momentum(0.5).make();
 
    auto forward = [&](Variable x) {
      x = std::get<0>(at::max_pool2d(conv1->forward({x})[0], {2, 2})).clamp_min(0);
@@ -630,14 +630,14 @@ std::map<std::string, void (*)()> constuct_tests() {
 
        optim->zero_grad();
        backward(loss);
-       optim->step(); 
+       optim->step();
      }
    }
 
    no_grad_guard guard;
    auto result = std::get<1>(forward(Var(tedata, false)).max(1));
    Variable correct = (result == Var(telabel)).toType(at::kFloat);
-   std::cout << "Num correct: " << correct.data().sum().toCFloat() 
+   std::cout << "Num correct: " << correct.data().sum().toCFloat()
      << " out of " << telabel.size(0) << std::endl;
    EXPECT(correct.data().sum().toCFloat() > telabel.size(0) * 0.8);
    return;
@@ -669,7 +669,7 @@ std::map<std::string, void (*)()> constuct_tests() {
      auto probs = Variable(std::get<0>(out));
      auto value = Variable(std::get<1>(out));
      auto action = probs.data().multinomial(1)[0].toCInt();
-     // Compute the log prob of a multinomial distribution. 
+     // Compute the log prob of a multinomial distribution.
      // This should probably be actually implemented in autogradpp...
      auto p = probs / probs.sum(-1, true);
      auto log_prob = p[action].log();
