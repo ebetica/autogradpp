@@ -43,6 +43,10 @@ ADD_CUSTOM_COMMAND(
   TARGET autogradpp PRE_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/pytorch/build/lib*/torch/_C*.so" "${CMAKE_BINARY_DIR}/libpythpp.so"
 )
+ADD_CUSTOM_COMMAND(
+  TARGET autogradpp PRE_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/pytorch/build/lib*/torch/lib/libshm.so" "${CMAKE_BINARY_DIR}/lib/libshm.so"
+)
 ADD_LIBRARY(libpythpp SHARED IMPORTED)
 SET_TARGET_PROPERTIES(libpythpp PROPERTIES IMPORTED_NO_SONAME 1
   IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/libpythpp.so")
