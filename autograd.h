@@ -4,10 +4,7 @@
 #include <memory>
 #include <fstream>
 
-// We have to include these to register optimizers
 #include "cereal/archives/binary.hpp"
-#include "cereal/archives/xml.hpp"
-#include "cereal/archives/json.hpp"
 #include "cereal/types/polymorphic.hpp"
 
 #include "cereal/types/vector.hpp"
@@ -67,13 +64,13 @@ void load(std::istream& stream, T* obj) {
   archive(*obj);
 }
 template <typename T>
-void save(std::string const& fn, T const & obj) {
-  std::ofstream os(fn, std::ios::binary);
+void save(std::string const& path, T const & obj) {
+  std::ofstream os(path, std::ios::binary);
   autograd::save(os, obj);
 }
 template <typename T>
-void load(std::string const& fn, T& obj) {
-  std::ifstream is(fn, std::ios::binary);
+void load(std::string const& path, T& obj) {
+  std::ifstream is(path, std::ios::binary);
   autograd::load(is, obj);
 }
 
@@ -364,7 +361,7 @@ class OptimizerImpl {
   virtual void step() = 0;
   void zero_grad();
 
-  void attach(Container model, bool clearState = true);
+  void set_model(Container model);
 
  protected:
   OptimizerImpl() { }
@@ -443,30 +440,8 @@ CEREAL_REGISTER_TYPE(autograd::Adam);
 CEREAL_REGISTER_POLYMORPHIC_RELATION(autograd::OptimizerImpl, autograd::Adam);
 
 namespace cereal {
-template<class Archive>
-void save(Archive & archive, at::Tensor const & tensor) { 
-  if (!tensor.defined()) {
-    auto type = at::ScalarType::Undefined;
-    archive(CEREAL_NVP(type));
-    return;
-  } else {
-    auto type = tensor.type().scalarType();
-    archive(CEREAL_NVP(type));
-  }
-  auto sizes = std::vector<int64_t>();
-  auto buf = std::vector<uint8_t>();
-  for (auto s : tensor.sizes()) {
-    sizes.push_back(s);
-  }
-  auto contig = tensor.toBackend(at::kCPU).contiguous();
-  auto size = tensor.storage()->size() * tensor.storage()->elementSize();
-  at::Backend backend = tensor.type().backend();
-
-  buf.resize(size);
-  memcpy(buf.data(), contig.storage()->data(), size);
-
-  archive(CEREAL_NVP(backend), CEREAL_NVP(sizes), CEREAL_NVP(buf)); 
-}
+// Gradients will not be saved for variables
+void save(BinaryOutputArchive & archive, at::Tensor const & tensor);
 
 /**
  * We follow these rules for loading:
@@ -474,37 +449,6 @@ void save(Archive & archive, at::Tensor const & tensor) {
  *    then we simply copy the data into the tensor, with resizing.
  * 2. Otherwise, overwrite the provided tensor with the right type and backend
  **/
-template<class Archive>
-void load(Archive & archive, at::Tensor & tensor) {
-  at::ScalarType type;
-  archive(CEREAL_NVP(type));
-  if (type == at::ScalarType::Undefined) {
-    tensor = at::Tensor();
-    return;
-  }
-
-  at::Backend backend;
-  auto sizes = std::vector<int64_t>();
-  auto buf = std::vector<uint8_t>();
-  archive(CEREAL_NVP(backend), CEREAL_NVP(sizes), CEREAL_NVP(buf)); 
-
-  if (!tensor.defined() || tensor.type().scalarType() != type) {
-    tensor = at::getType(backend, type).tensor();
-  }
-  if (tensor.type().is_cuda()) {
-    // should actually use cudamemcpy probably
-    auto cputensor = at::CPU(tensor.type().scalarType()).tensor(sizes);
-    tensor.resize_(sizes);
-    memcpy(cputensor.storage()->data(), buf.data(), buf.size());
-    tensor.copy_(cputensor);
-  } else {
-    tensor.resize_(sizes);
-    memcpy(tensor.storage()->data(), buf.data(), buf.size());
-  }
-} 
-
-template<class Archive>
-void load(Archive & archive, tag::Variable & tensor) {
-  load(archive, tensor.data());
-} 
+void load(BinaryInputArchive & archive, at::Tensor & tensor); 
+void load(BinaryInputArchive & archive, tag::Variable & var); 
 }  // namespace cereal

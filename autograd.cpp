@@ -297,11 +297,8 @@ void OptimizerImpl::zero_grad() {
   }
 }
 
-void OptimizerImpl::attach(Container model, bool clearState) {
+void OptimizerImpl::set_model(Container model) {
   model_ = model;
-  if (clearState) {
-    this->init_state();
-  }
 }
 
 void SGD::step() {
@@ -381,4 +378,67 @@ void Adam::init_state() {
   exp_avg_sq_buffer_.clear();
 }
 
+} // namespace autograd
+
+namespace cereal {
+void save(BinaryOutputArchive & archive, at::Tensor const & tensor) { 
+  if (!tensor.defined()) {
+    auto type = at::ScalarType::Undefined;
+    archive(CEREAL_NVP(type));
+    return;
+  } else {
+    auto type = tensor.type().scalarType();
+    archive(CEREAL_NVP(type));
+  }
+  auto sizes = std::vector<int64_t>();
+  auto buf = std::vector<uint8_t>();
+  for (auto s : tensor.sizes()) {
+    sizes.push_back(s);
+  }
+  auto contig = tensor.toBackend(at::kCPU).contiguous();
+  uint64_t size = tensor.storage()->size() * tensor.storage()->elementSize();
+  at::Backend backend = tensor.type().backend();
+
+  archive(CEREAL_NVP(backend), CEREAL_NVP(sizes), CEREAL_NVP(size));
+  archive.saveBinary(contig.storage()->data(), size); 
 }
+
+/**
+ * We follow these rules for loading:
+ * 1. If tensor is defined, and the same ScalarType as the saved tensor,
+ *    then we simply copy the data into the tensor, with resizing.
+ * 2. Otherwise, overwrite the provided tensor with the right type and backend
+ **/
+void load(BinaryInputArchive & archive, at::Tensor & tensor) {
+  at::ScalarType type;
+  archive(CEREAL_NVP(type));
+  if (type == at::ScalarType::Undefined) {
+    tensor = at::Tensor();
+    return;
+  }
+
+  at::Backend backend;
+  auto sizes = std::vector<int64_t>();
+  auto buf = std::vector<uint8_t>();
+  uint64_t size;
+  archive(CEREAL_NVP(backend), CEREAL_NVP(sizes), CEREAL_NVP(size)); 
+
+  if (!tensor.defined() || tensor.type().scalarType() != type) {
+    tensor = at::getType(backend, type).tensor();
+  }
+  if (tensor.type().is_cuda()) {
+    // should actually use cudamemcpy probably
+    auto cputensor = at::CPU(tensor.type().scalarType()).tensor(sizes);
+    tensor.resize_(sizes);
+    archive.loadBinary(cputensor.storage()->data(), size);
+    tensor.copy_(cputensor);
+  } else {
+    tensor.resize_(sizes);
+    archive.loadBinary(tensor.storage()->data(), size);
+  }
+} 
+
+void load(BinaryInputArchive & archive, tag::Variable & var) {
+  load(archive, var.data());
+} 
+}  // namespace cereal
