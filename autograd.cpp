@@ -1,6 +1,4 @@
 #include <cmath>
-#include <fstream>
-#include <cereal/archives/binary.hpp>
 
 #include "autograd.h"
 
@@ -21,18 +19,6 @@ void backward(Variable loss, bool keep_graph) {
 void backward(Tensor loss, bool keep_graph) {
   Variable tmp(loss);
   backward(tmp, keep_graph);
-}
-
-void save(std::string fn, Container const model) {
-  std::ofstream os(fn, std::ios::binary);
-  cereal::BinaryOutputArchive archive(os);
-  archive(*model);
-}
-
-void load(std::string fn, Container model) {
-  std::ifstream is(fn, std::ios::binary);
-  cereal::BinaryInputArchive archive(is);
-  archive(*model);
 }
 
 std::map<std::string, Variable> ContainerImpl::parameters() const {
@@ -311,6 +297,10 @@ void OptimizerImpl::zero_grad() {
   }
 }
 
+void OptimizerImpl::set_model(Container model) {
+  model_ = model;
+}
+
 void SGD::step() {
   for (auto& pair : model_->parameters()) {
     auto& name = pair.first;
@@ -323,11 +313,11 @@ void SGD::step() {
 
     if (momentum_ != 0) {
       at::Tensor buf;
-      if (momentum_buffers.find(name) == momentum_buffers.end()) {
-        buf = momentum_buffers[name] = at::zeros_like(p);
+      if (momentum_buffers_.find(name) == momentum_buffers_.end()) {
+        buf = momentum_buffers_[name] = at::zeros_like(p);
         buf.mul_(momentum_).add_(d_p);
       } else {
-        buf = momentum_buffers[name];
+        buf = momentum_buffers_[name];
         buf.mul_(momentum_).add_(d_p, 1 - dampening_);
       }
 
@@ -342,6 +332,10 @@ void SGD::step() {
   }
 }
 
+void SGD::init_state() {
+  momentum_buffers_.clear();
+}
+
 void Adam::step() {
   for (auto& pair : model_->parameters()) {
     auto& name = pair.first;
@@ -349,15 +343,15 @@ void Adam::step() {
     auto& p = pair.second.data();
     if (!grad.defined()) continue;
 
-    if (step_buffer.find(name) == step_buffer.end()) {
-      step_buffer[name] = 0;
-      exp_avg_buffer[name] = at::zeros_like(p);
-      exp_avg_sq_buffer[name] = at::zeros_like(p);
+    if (step_buffer_.find(name) == step_buffer_.end()) {
+      step_buffer_[name] = 0;
+      exp_avg_buffer_[name] = at::zeros_like(p);
+      exp_avg_sq_buffer_[name] = at::zeros_like(p);
     }
 
-    auto& step = step_buffer[name];
-    auto& exp_avg = exp_avg_buffer[name];
-    auto& exp_avg_sq = exp_avg_sq_buffer[name];
+    auto& step = step_buffer_[name];
+    auto& exp_avg = exp_avg_buffer_[name];
+    auto& exp_avg_sq = exp_avg_sq_buffer_[name];
 
     step += 1;
 
@@ -378,4 +372,10 @@ void Adam::step() {
   }
 }
 
+void Adam::init_state() {
+  step_buffer_.clear();
+  exp_avg_buffer_.clear();
+  exp_avg_sq_buffer_.clear();
 }
+
+} // namespace autograd

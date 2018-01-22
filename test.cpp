@@ -387,6 +387,20 @@ std::map<std::string, void (*)()> constuct_tests() {
    }
  };
 
+ tests["autograd/serialization/undefined"] = []() { 
+   auto x = at::Tensor();
+   
+   EXPECT(!x.defined());
+
+   auto y = at::CPU(at::kFloat).randn({5});
+
+   std::stringstream ss;
+   save(ss, &x);
+   load(ss, &y);
+
+   EXPECT(!y.defined());
+ };
+
  tests["autograd/serialization/xor"] = []() {
    // We better be able to save and load a XOR model!
    auto makeModel = []() {
@@ -432,19 +446,75 @@ std::map<std::string, void (*)()> constuct_tests() {
      epoch++;
    }
    
-   save("test.bin", model);
-   load("test.bin", model2);
+   std::stringstream ss;
+   save(ss, model);
+   load(ss, model2);
 
    auto loss = getLoss(model2, 100);
    EXPECT(loss.toCFloat() < 0.1);
 
    CUDA_GUARD;
    model2->cuda();
-   save("test.bin", model2);
-   load("test.bin", model3);
+   ss.clear();
+   save(ss, model2);
+   load(ss, model3);
 
    loss = getLoss(model3, 100);
    EXPECT(loss.toCFloat() < 0.1);
+ };
+
+ tests["autograd/serialization/optim"] = []() {
+   auto model1 = Linear(5, 2).make();
+   auto model2 = Linear(5, 2).make();
+   auto model3 = Linear(5, 2).make();
+
+   // Models 1, 2, 3 will have the same params
+   std::stringstream ss;
+   save(ss, model1);
+   load(ss, model2);
+   ss.seekg(0, std::ios::beg);
+   load(ss, model3);
+
+   // Make some optimizers with momentum (and thus state)
+   auto optim1 = SGD(model1, 1e-1).momentum(0.9).make(); 
+   auto optim2 = SGD(model2, 1e-1).momentum(0.9).make(); 
+   auto optim2_2 = SGD(model2, 1e-1).momentum(0.9).make(); 
+   auto optim3 = SGD(model3, 1e-1).momentum(0.9).make(); 
+   auto optim3_2 = SGD(model3, 1e-1).momentum(0.9).make(); 
+
+   auto x = Var(at::CPU(at::kFloat).ones({10, 5}), true);
+
+   auto step = [&](Optimizer optim, Container model) {
+     optim->zero_grad();
+     auto y = model->forward({x})[0].sum();
+     backward(y);
+     optim->step();
+   };
+
+   // Do 2 steps of model1
+   step(optim1, model1);
+   step(optim1, model1);
+
+   // Do 2 steps of model 2 without saving the optimizer
+   step(optim2, model2);
+   step(optim2_2, model2);
+   
+   // Do 2 steps of model 3 while saving the optimizer
+   step(optim3, model3);
+   ss.clear();
+   save(ss, optim3);
+   load(ss, optim3_2);
+   step(optim3_2, model3);
+
+   auto param1 = model1->parameters();
+   auto param2 = model2->parameters();
+   auto param3 = model3->parameters();
+   for (auto& p : param1) {
+     auto name = p.first;
+     // Model 1 and 3 should be the same
+     EXPECT(param1[name].norm().toCFloat() == param3[name].norm().toCFloat());
+     EXPECT(param1[name].norm().toCFloat() != param2[name].norm().toCFloat());
+   }
  };
 
  tests["autograd/~integration/mnist"] = []() {  // ~ will make it run last :D
