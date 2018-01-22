@@ -441,7 +441,28 @@ CEREAL_REGISTER_POLYMORPHIC_RELATION(autograd::OptimizerImpl, autograd::Adam);
 
 namespace cereal {
 // Gradients will not be saved for variables
-void save(BinaryOutputArchive & archive, at::Tensor const & tensor);
+template <class Archive>
+void save(Archive & archive, at::Tensor const & tensor) { 
+  if (!tensor.defined()) {
+    auto type = at::ScalarType::Undefined;
+    archive(CEREAL_NVP(type));
+    return;
+  } else {
+    auto type = tensor.type().scalarType();
+    archive(CEREAL_NVP(type));
+  }
+  auto sizes = std::vector<int64_t>();
+  auto buf = std::vector<uint8_t>();
+  for (auto s : tensor.sizes()) {
+    sizes.push_back(s);
+  }
+  auto contig = tensor.toBackend(at::kCPU).contiguous();
+  uint64_t size = tensor.storage()->size() * tensor.storage()->elementSize();
+  at::Backend backend = tensor.type().backend();
+
+  archive(CEREAL_NVP(backend), CEREAL_NVP(sizes), CEREAL_NVP(size));
+  archive.saveBinary(contig.storage()->data(), size); 
+}
 
 /**
  * We follow these rules for loading:
@@ -449,6 +470,38 @@ void save(BinaryOutputArchive & archive, at::Tensor const & tensor);
  *    then we simply copy the data into the tensor, with resizing.
  * 2. Otherwise, overwrite the provided tensor with the right type and backend
  **/
-void load(BinaryInputArchive & archive, at::Tensor & tensor); 
-void load(BinaryInputArchive & archive, tag::Variable & var); 
+template <class Archive>
+void load(Archive & archive, at::Tensor & tensor) {
+  at::ScalarType type;
+  archive(CEREAL_NVP(type));
+  if (type == at::ScalarType::Undefined) {
+    tensor = at::Tensor();
+    return;
+  }
+
+  at::Backend backend;
+  auto sizes = std::vector<int64_t>();
+  auto buf = std::vector<uint8_t>();
+  uint64_t size;
+  archive(CEREAL_NVP(backend), CEREAL_NVP(sizes), CEREAL_NVP(size)); 
+
+  if (!tensor.defined() || tensor.type().scalarType() != type) {
+    tensor = at::getType(backend, type).tensor();
+  }
+  if (tensor.type().is_cuda()) {
+    // should actually use cudamemcpy probably
+    auto cputensor = at::CPU(tensor.type().scalarType()).tensor(sizes);
+    tensor.resize_(sizes);
+    archive.loadBinary(cputensor.storage()->data(), size);
+    tensor.copy_(cputensor);
+  } else {
+    tensor.resize_(sizes);
+    archive.loadBinary(tensor.storage()->data(), size);
+  }
+} 
+
+template <class Archive>
+void load(Archive & archive, tag::Variable & var) {
+  load(archive, var.data());
+} 
 }  // namespace cereal
