@@ -1,3 +1,4 @@
+#include <functional>
 #include <map>
 #include <regex>
 #include <math.h>
@@ -11,7 +12,7 @@ using namespace autograd;
 #define EXPECT(CODE) if (CODE); else { throw std::runtime_error(__FILE__ ":" STR(__LINE__) ": " #CODE); }
 
 #if AT_CUDA_ENABLED()
-#define CUDA_GUARD 
+#define CUDA_GUARD
 #else
 #define CUDA_GUARD std::cerr << "No cuda, skipping test" << std::endl; return
 #endif
@@ -81,9 +82,9 @@ class CartPole {
       state[1] = x_dot;
       state[2] = theta;
       state[3] = theta_dot;
-      done =  x < - x_threshold 
-           || x > x_threshold 
-           || theta < -theta_threshold_radians 
+      done =  x < - x_threshold
+           || x > x_threshold
+           || theta < -theta_threshold_radians
            || theta > theta_threshold_radians
            || step_ > 200;
 
@@ -103,8 +104,8 @@ class CartPole {
     };
 };
 
-std::map<std::string, void (*)()> constuct_tests() {
- std::map<std::string, void (*)()> tests;
+std::map<std::string, std::function<void()>> construct_tests() {
+ std::map<std::string, std::function<void()>> tests;
 
  tests["autograd/no_grad/1"] = []() {
    no_grad_guard guard;
@@ -353,8 +354,8 @@ std::map<std::string, void (*)()> constuct_tests() {
      .append(Linear(2, 8).make())
      .append(Linear(8, 1).make())
      .make();
-   
-   auto optim = SGD(model, 1e-1).momentum(0.9).nesterov().weight_decay(1e-6).make(); 
+
+   auto optim = SGD(model, 1e-1).momentum(0.9).nesterov().weight_decay(1e-6).make();
 
    float running_loss = 1;
    int epoch = 0;
@@ -370,16 +371,16 @@ std::map<std::string, void (*)()> constuct_tests() {
        inp[i][1] = b;
        lab[i] = c;
      }
-     
+     //
      // forward
      auto x = Var(inp);
      auto y = Var(lab, false);
      for (auto layer : *model) x = layer->forward({x})[0].sigmoid_();
      Variable loss = at::binary_cross_entropy(x, y);
-      
+
      optim->zero_grad();
      backward(loss);
-     optim->step(); 
+     optim->step();
 
      running_loss = running_loss * 0.99 + loss.data().sum().toCFloat() * 0.01;
      EXPECT(epoch < 3000);
@@ -387,9 +388,9 @@ std::map<std::string, void (*)()> constuct_tests() {
    }
  };
 
- tests["autograd/serialization/undefined"] = []() { 
+ tests["autograd/serialization/undefined"] = []() {
    auto x = at::Tensor();
-   
+
    EXPECT(!x.defined());
 
    auto y = at::CPU(at::kFloat).randn({5});
@@ -420,7 +421,7 @@ std::map<std::string, void (*)()> constuct_tests() {
        inp[i][1] = b;
        lab[i] = c;
      }
-     
+
      // forward
      auto x = Var(inp);
      auto y = Var(lab, false);
@@ -431,7 +432,7 @@ std::map<std::string, void (*)()> constuct_tests() {
    auto model = makeModel();
    auto model2 = makeModel();
    auto model3 = makeModel();
-   auto optim = SGD(model, 1e-1).momentum(0.9).nesterov().weight_decay(1e-6).make(); 
+   auto optim = SGD(model, 1e-1).momentum(0.9).nesterov().weight_decay(1e-6).make();
 
    float running_loss = 1;
    int epoch = 0;
@@ -439,13 +440,13 @@ std::map<std::string, void (*)()> constuct_tests() {
      Variable loss = getLoss(model, 4);
      optim->zero_grad();
      backward(loss);
-     optim->step(); 
+     optim->step();
 
      running_loss = running_loss * 0.99 + loss.data().sum().toCFloat() * 0.01;
      EXPECT(epoch < 3000);
      epoch++;
    }
-   
+
    std::stringstream ss;
    save(ss, model);
    load(ss, model2);
@@ -476,11 +477,11 @@ std::map<std::string, void (*)()> constuct_tests() {
    load(ss, model3);
 
    // Make some optimizers with momentum (and thus state)
-   auto optim1 = SGD(model1, 1e-1).momentum(0.9).make(); 
-   auto optim2 = SGD(model2, 1e-1).momentum(0.9).make(); 
-   auto optim2_2 = SGD(model2, 1e-1).momentum(0.9).make(); 
-   auto optim3 = SGD(model3, 1e-1).momentum(0.9).make(); 
-   auto optim3_2 = SGD(model3, 1e-1).momentum(0.9).make(); 
+   auto optim1 = SGD(model1, 1e-1).momentum(0.9).make();
+   auto optim2 = SGD(model2, 1e-1).momentum(0.9).make();
+   auto optim2_2 = SGD(model2, 1e-1).momentum(0.9).make();
+   auto optim3 = SGD(model3, 1e-1).momentum(0.9).make();
+   auto optim3_2 = SGD(model3, 1e-1).momentum(0.9).make();
 
    auto x = Var(at::CPU(at::kFloat).ones({10, 5}), true);
 
@@ -498,7 +499,7 @@ std::map<std::string, void (*)()> constuct_tests() {
    // Do 2 steps of model 2 without saving the optimizer
    step(optim2, model2);
    step(optim2_2, model2);
-   
+
    // Do 2 steps of model 3 while saving the optimizer
    step(optim3, model3);
    ss.clear();
@@ -517,10 +518,11 @@ std::map<std::string, void (*)()> constuct_tests() {
    }
  };
 
- tests["autograd/~integration/mnist"] = []() {  // ~ will make it run last :D
+ auto test_mnist = [](
+     uint32_t batch_size, uint32_t num_epochs, bool useGPU,
+     auto& model, auto& forward_op, auto& optim) {
    CUDA_GUARD;
-   std::cout << "Training MNST for 3 epochs, rest your eyes for a bit!\n";
-   auto useGPU = true;
+   std::cout << "Training MNIST for " << num_epochs << " epochs, rest your eyes for a bit!\n";
    struct MNIST_Reader
    {
      FILE *fp_;
@@ -556,11 +558,13 @@ std::map<std::string, void (*)()> constuct_tests() {
      auto data = at::CPU(at::kFloat).tensor({image_count, 1, image_rows, image_cols});
      auto a_data = data.accessor<float, 4>();
 
-     for (int c = 0; c < image_count; c++)
-       for (int i = 0; i < image_rows; i++)
+     for (int c = 0; c < image_count; c++) {
+       for (int i = 0; i < image_rows; i++) {
          for (int j = 0; j < image_cols; j++) {
            a_data[c][0][i][j] = float(rd.read_byte()) / 255;
-     }     
+         }
+       }
+     }
 
      return data.toBackend(useGPU ? at::kCUDA : at::kCPU);
    };
@@ -584,6 +588,43 @@ std::map<std::string, void (*)()> constuct_tests() {
    auto tedata = readData("mnist/t10k-images-idx3-ubyte");
    auto telabel = readLabels("mnist/t10k-labels-idx1-ubyte");
 
+   if (useGPU) {
+     model->cuda();
+   }
+
+   for (auto epoch = 0U; epoch < num_epochs; epoch++) {
+     auto shuffled_inds = std::vector<int>(trdata.size(0));
+     for (int i=0; i < trdata.size(0); i++) {
+      shuffled_inds[i] = i;
+     }
+     std::random_shuffle(shuffled_inds.begin(), shuffled_inds.end());
+
+     auto inp = (useGPU ? at::CUDA : at::CPU)(at::kFloat).tensor({batch_size, 1, trdata.size(2), trdata.size(3)});
+     auto lab = (useGPU ? at::CUDA : at::CPU)(at::kLong).tensor({batch_size});
+     for (auto p = 0U; p < shuffled_inds.size() - batch_size; p++) {
+       inp[p % batch_size] = trdata[shuffled_inds[p]];
+       lab[p % batch_size] = trlabel[shuffled_inds[p]];
+
+       if (p % batch_size != batch_size - 1) continue;
+       Variable x = forward_op(Var(inp));
+       Variable y = Var(lab, false);
+       Variable loss = at::nll_loss(x, y);
+
+       optim->zero_grad();
+       backward(loss);
+       optim->step();
+     }
+   }
+
+   no_grad_guard guard;
+   auto result = std::get<1>(forward_op(Var(tedata, false)).max(1));
+   Variable correct = (result == Var(telabel)).toType(at::kFloat);
+   std::cout << "Num correct: " << correct.data().sum().toCFloat()
+     << " out of " << telabel.size(0) << std::endl;
+   EXPECT(correct.data().sum().toCFloat() > telabel.size(0) * 0.8);
+ };
+
+ tests["autograd/~integration/mnist"] = [test_mnist]() {  // ~ will make it run last :D
    auto model = SimpleContainer().make();
    auto conv1 = model->add(Conv2d(1, 10, 5).make(), "conv1");
    auto conv2 = model->add(Conv2d(10, 20, 5).make(), "conv2");
@@ -591,9 +632,6 @@ std::map<std::string, void (*)()> constuct_tests() {
    auto drop2d = Dropout2d(0.3).make();
    auto linear1 = model->add(Linear(320, 50).make(), "linear1");
    auto linear2 = model->add(Linear(50, 10).make(), "linear2");
-   if (useGPU) model->cuda();
-   
-   auto optim = SGD(model, 1e-2).momentum(0.5).make(); 
 
    auto forward = [&](Variable x) {
      x = std::get<0>(at::max_pool2d(conv1->forward({x})[0], {2, 2})).clamp_min(0);
@@ -609,59 +647,70 @@ std::map<std::string, void (*)()> constuct_tests() {
      return x;
    };
 
-   auto bs = 32U;
-   for (auto epoch = 0U; epoch < 3; epoch++) {
-     auto shuffled_inds = std::vector<int>(trdata.size(0));
-     for (int i=0; i < trdata.size(0); i++) {
-      shuffled_inds[i] = i;
-     }
-     std::random_shuffle(shuffled_inds.begin(), shuffled_inds.end());
+   auto optim = SGD(model, 1e-2).momentum(0.5).make();
 
-     auto inp = (useGPU ? at::CUDA : at::CPU)(at::kFloat).tensor({bs, 1, trdata.size(2), trdata.size(3)});
-     auto lab = (useGPU ? at::CUDA : at::CPU)(at::kLong).tensor({bs});
-     for (auto p = 0U; p < shuffled_inds.size() - bs; p++) {
-       inp[p % bs] = trdata[shuffled_inds[p]];
-       lab[p % bs] = trlabel[shuffled_inds[p]];
-
-       if (p % bs != bs - 1) continue;
-       Variable x = forward(Var(inp));
-       Variable y = Var(lab, false);
-       Variable loss = at::nll_loss(x, y);
-
-       optim->zero_grad();
-       backward(loss);
-       optim->step(); 
-     }
-   }
-
-   no_grad_guard guard;
-   auto result = std::get<1>(forward(Var(tedata, false)).max(1));
-   Variable correct = (result == Var(telabel)).toType(at::kFloat);
-   std::cout << "Num correct: " << correct.data().sum().toCFloat() 
-     << " out of " << telabel.size(0) << std::endl;
-   EXPECT(correct.data().sum().toCFloat() > telabel.size(0) * 0.8);
-   return;
+   test_mnist(
+       32,  // batch_size
+       3,  // num_epochs
+       true,  // useGPU
+       model, forward, optim);
  };
 
- tests["autograd/~integration/cartpole"] = []() {
-   std::cout << "Training episodic policy gradient with a critic for up to 3000"
-     " episodes, rest your eyes for a bit!\n";
+ tests["autograd/~integration/mnist_batchnorm"] = [test_mnist]() {  // ~ will make it run last :D
    auto model = SimpleContainer().make();
-   auto linear = model->add(Linear(4, 128).make(), "linear");
-   auto policyHead = model->add(Linear(128, 2).make(), "policy");
-   auto valueHead = model->add(Linear(128, 1).make(), "action");
-   auto optim = Adam(model, 1e-3).make();
+   auto conv1 = model->add(Conv2d(1, 10, 5).make(), "conv1");
+   auto batchnorm2d = model->add(
+       BatchNorm(10).stateful().make(),
+       "batchnorm2d");
+   auto conv2 = model->add(Conv2d(10, 20, 5).make(), "conv2");
+   auto linear1 = model->add(Linear(320, 50).make(), "linear1");
+   auto batchnorm1 = model->add(
+       BatchNorm(50).stateful().make(),
+       "batchnorm1");
+   auto linear2 = model->add(Linear(50, 10).make(), "linear2");
 
-   std::vector<Variable> saved_log_probs;
-   std::vector<Variable> saved_values;
-   std::vector<float> rewards;
+   auto forward = [&](Variable x) {
+     x = std::get<0>(at::max_pool2d(conv1->forward({x})[0], {2, 2})).clamp_min(0);
+     x = batchnorm2d->forward({x})[0];
+     x = conv2->forward({x})[0];
+     x = std::get<0>(at::max_pool2d(x, {2, 2})).clamp_min(0);
 
-   auto forward = [&](variable_list inp) {
-     auto x = linear->forward(inp)[0].clamp_min(0);
-     Variable actions = policyHead->forward({x})[0];
-     Variable value = valueHead->forward({x})[0];
-     return std::make_tuple(at::softmax(actions, -1), value);
+     x = x.view({-1, 320});
+     x = linear1->forward({x})[0].clamp_min(0);
+     x = batchnorm1->forward({x})[0];
+     x = linear2->forward({x})[0];
+     x = at::log_softmax(x, 1);
+     return x;
    };
+
+   auto optim = SGD(model, 1e-2).momentum(0.5).make();
+
+   test_mnist(
+       32,  // batch_size
+       3,  // num_epochs
+       true,  // useGPU
+       model, forward, optim);
+ };
+
+tests["autograd/~integration/cartpole"] = []() {
+  std::cout << "Training episodic policy gradient with a critic for up to 3000"
+    " episodes, rest your eyes for a bit!\n";
+  auto model = SimpleContainer().make();
+  auto linear = model->add(Linear(4, 128).make(), "linear");
+  auto policyHead = model->add(Linear(128, 2).make(), "policy");
+  auto valueHead = model->add(Linear(128, 1).make(), "action");
+  auto optim = Adam(model, 1e-3).make();
+
+  std::vector<Variable> saved_log_probs;
+  std::vector<Variable> saved_values;
+  std::vector<float> rewards;
+
+  auto forward = [&](variable_list inp) {
+    auto x = linear->forward(inp)[0].clamp_min(0);
+    Variable actions = policyHead->forward({x})[0];
+    Variable value = valueHead->forward({x})[0];
+    return std::make_tuple(at::softmax(actions, -1), value);
+  };
 
    auto selectAction = [&](at::Tensor state) {
      // Only work on single state right now, change index to gather for batch
@@ -669,7 +718,7 @@ std::map<std::string, void (*)()> constuct_tests() {
      auto probs = Variable(std::get<0>(out));
      auto value = Variable(std::get<1>(out));
      auto action = probs.data().multinomial(1)[0].toCInt();
-     // Compute the log prob of a multinomial distribution. 
+     // Compute the log prob of a multinomial distribution.
      // This should probably be actually implemented in autogradpp...
      auto p = probs / probs.sum(-1, true);
      auto log_prob = p[action].log();
@@ -678,69 +727,69 @@ std::map<std::string, void (*)()> constuct_tests() {
      return action;
    };
 
-   auto finishEpisode = [&]() {
-     auto R = 0.;
-     for (int i = rewards.size() - 1; i >= 0; i--) {
-       R = rewards[i] + 0.99 * R;
-       rewards[i] = R;
-     }
-     auto r_t = at::CPU(at::kFloat).tensorFromBlob(rewards.data(), {static_cast<int64_t>(rewards.size())});
-     r_t = (r_t - r_t.mean()) / (r_t.std() + 1e-5);
+  auto finishEpisode = [&]() {
+    auto R = 0.;
+    for (int i = rewards.size() - 1; i >= 0; i--) {
+      R = rewards[i] + 0.99 * R;
+      rewards[i] = R;
+    }
+    auto r_t = at::CPU(at::kFloat).tensorFromBlob(rewards.data(), {static_cast<int64_t>(rewards.size())});
+    r_t = (r_t - r_t.mean()) / (r_t.std() + 1e-5);
 
-     std::vector<at::Tensor> policy_loss;
-     std::vector<at::Tensor> value_loss;
-     for (auto i = 0U; i < saved_log_probs.size(); i++) {
-       auto r = rewards[i] - saved_values[i].toCFloat();
-       policy_loss.push_back(- r * saved_log_probs[i]);
-       value_loss.push_back(at::smooth_l1_loss(saved_values[i], Var(at::CPU(at::kFloat).scalarTensor(at::Scalar(rewards[i])), false)));
-     }
-     auto loss = at::cat(policy_loss).sum() + at::cat(value_loss).sum();
+    std::vector<at::Tensor> policy_loss;
+    std::vector<at::Tensor> value_loss;
+    for (auto i = 0U; i < saved_log_probs.size(); i++) {
+      auto r = rewards[i] - saved_values[i].toCFloat();
+      policy_loss.push_back(- r * saved_log_probs[i]);
+      value_loss.push_back(at::smooth_l1_loss(saved_values[i], Var(at::CPU(at::kFloat).scalarTensor(at::Scalar(rewards[i])), false)));
+    }
+    auto loss = at::cat(policy_loss).sum() + at::cat(value_loss).sum();
 
-     optim->zero_grad();
-     backward(loss);
-     optim->step();
+    optim->zero_grad();
+    backward(loss);
+    optim->step();
 
-     rewards.clear();
-     saved_log_probs.clear();
-     saved_values.clear();
-   };
+    rewards.clear();
+    saved_log_probs.clear();
+    saved_values.clear();
+  };
 
-   auto env = CartPole();
-   double running_reward = 10.0;
-   for (auto episode = 0; ; episode++) {
-     env.reset();
-     auto state = env.getState();
-     int t = 0;
-     for ( ; t < 10000; t++) {
-       auto action = selectAction(state);
-       env.step(action);
-       state = env.getState();
-       auto reward = env.getReward();
-       auto done = env.isDone();
+  auto env = CartPole();
+  double running_reward = 10.0;
+  for (auto episode = 0; ; episode++) {
+    env.reset();
+    auto state = env.getState();
+    int t = 0;
+    for ( ; t < 10000; t++) {
+      auto action = selectAction(state);
+      env.step(action);
+      state = env.getState();
+      auto reward = env.getReward();
+      auto done = env.isDone();
 
-       rewards.push_back(reward);
-       if (done) break;
-     }
+      rewards.push_back(reward);
+      if (done) break;
+    }
 
-     running_reward = running_reward * 0.99 + t * 0.01;
-     finishEpisode();
-     /*
-     if (episode % 10 == 0) {
-       printf("Episode %i\tLast length: %5d\tAverage length: %.2f\n",
-               episode, t, running_reward);
-     }
-     */
-     if (running_reward > 150) break;
-     EXPECT(episode < 3000);
-   }
+    running_reward = running_reward * 0.99 + t * 0.01;
+    finishEpisode();
+    /*
+    if (episode % 10 == 0) {
+      printf("Episode %i\tLast length: %5d\tAverage length: %.2f\n",
+              episode, t, running_reward);
+    }
+    */
+    if (running_reward > 150) break;
+    EXPECT(episode < 3000);
+  }
 
- };
+};
 
  return tests;
 }
 
 int main(int argc, char** argv) {
-  for (auto p : constuct_tests()) {
+  for (auto p : construct_tests()) {
     if (argc == 1) {
       std::cout << "Doing " << p.first << "\n";
       p.second();

@@ -96,13 +96,13 @@ class no_grad_guard {
 };
 
 class ContainerImpl {
- public: 
+ public:
   virtual void reset_parameters() { };
 
   virtual variable_list forward(variable_list) = 0;
   virtual void initialize_parameters() { };
 
-  std::map<std::string, Variable> parameters() const; 
+  std::map<std::string, Variable> parameters() const;
 
   void cuda();
   void cpu();
@@ -230,7 +230,7 @@ AUTOGRAD_CONTAINER_CLASS(Embedding) {
 
 AUTOGRAD_CONTAINER_CLASS(Conv) {
  private:
-  Conv(uint32_t Nd, uint32_t in_chan, uint32_t out_chan) 
+  Conv(uint32_t Nd, uint32_t in_chan, uint32_t out_chan)
     : Nd_(Nd),
       in_channels_(in_chan),
       out_channels_(out_chan),
@@ -242,12 +242,12 @@ AUTOGRAD_CONTAINER_CLASS(Conv) {
       { }
 
  public:
-  Conv(uint32_t Nd, uint32_t in_chan, uint32_t out_chan, int ks) 
+  Conv(uint32_t Nd, uint32_t in_chan, uint32_t out_chan, int ks)
     : Conv(Nd, in_chan, out_chan) {
       ks_ = makeTup(ks, 1);
     }
 
-  Conv(uint32_t Nd, uint32_t in_chan, uint32_t out_chan, IntVec ks) 
+  Conv(uint32_t Nd, uint32_t in_chan, uint32_t out_chan, IntVec ks)
     : Conv(Nd, in_chan, out_chan) {
       ks_ = makeTup(ks);
     }
@@ -268,7 +268,7 @@ AUTOGRAD_CONTAINER_CLASS(Conv) {
   AUTOGRAD_KWARG(Conv, bool, transposed, false, true)
   AUTOGRAD_KWARG(Conv, bool, no_bias, false, true)
   AUTOGRAD_KWARG(Conv, int, groups, 1, 1)
-  
+
    Variable weight, bias;
    uint32_t Nd_;
    uint32_t in_channels_;
@@ -297,22 +297,44 @@ AUTOGRAD_CONTAINER_CLASS(Conv) {
 
 class Conv1d : public Conv {
  public:
-  Conv1d(uint32_t i, uint32_t o, int ks) : Conv(1, i, o, ks) { } 
+  Conv1d(uint32_t i, uint32_t o, int ks) : Conv(1, i, o, ks) { }
   Conv1d(uint32_t i, uint32_t o, IntVec ks) : Conv(1, i, o, ks) { }
 };
 
 class Conv2d : public Conv {
  public:
-  Conv2d(uint32_t i, uint32_t o, int ks) : Conv(2, i, o, ks) { } 
+  Conv2d(uint32_t i, uint32_t o, int ks) : Conv(2, i, o, ks) { }
   Conv2d(uint32_t i, uint32_t o, IntVec ks) : Conv(2, i, o, ks) { }
 };
 
 class Conv3d : public Conv {
  public:
-  Conv3d(uint32_t i, uint32_t o, int ks) : Conv(3, i, o, ks) { } 
+  Conv3d(uint32_t i, uint32_t o, int ks) : Conv(3, i, o, ks) { }
   Conv3d(uint32_t i, uint32_t o, IntVec ks) : Conv(3, i, o, ks) { }
 };
 
+AUTOGRAD_CONTAINER_CLASS(BatchNorm) {
+ public:
+  BatchNorm(uint32_t num_features)
+    : num_features_(num_features) {}
+
+  AUTOGRAD_KWARG(BatchNorm, double, eps, 1e-5, 1e-5)
+  AUTOGRAD_KWARG(BatchNorm, double, momentum, 0.1, 0.1)
+  AUTOGRAD_KWARG(BatchNorm, bool, affine, true, true)
+  AUTOGRAD_KWARG(BatchNorm, bool, stateful, false, true)
+
+  void reset_parameters() override;
+  variable_list forward(variable_list) override;
+  void initialize_parameters() override;
+
+  Variable weight;
+  Variable bias;
+  Variable running_mean;
+  Variable running_var;
+
+ protected:
+  uint32_t num_features_;
+};
 
 AUTOGRAD_CONTAINER_CLASS(Dropout) {
  public:
@@ -377,7 +399,7 @@ class Optimizer_CRTP : public OptimizerImpl {
     ptr->init_state();
     return ptr;
   }
- 
+
  protected:
   Optimizer_CRTP() { }
 };
@@ -393,10 +415,10 @@ AUTOGRAD_OPTIMIZER_CLASS(SGD) {
   void init_state() override;
 
   template <class Archive>
-  void serialize(Archive & ar) { 
-    ar(CEREAL_NVP(momentum_buffers_)); 
+  void serialize(Archive & ar) {
+    ar(CEREAL_NVP(momentum_buffers_));
   }
-  
+
  private:
   friend class cereal::access;
   SGD() { }
@@ -416,12 +438,12 @@ AUTOGRAD_OPTIMIZER_CLASS(Adam) {
   void init_state() override;
 
   template <class Archive>
-  void serialize(Archive & ar) { 
+  void serialize(Archive & ar) {
     ar(CEREAL_NVP(step_buffer_),
        CEREAL_NVP(exp_avg_buffer_),
-       CEREAL_NVP(exp_avg_sq_buffer_)); 
+       CEREAL_NVP(exp_avg_sq_buffer_));
   }
-  
+
  private:
   friend class cereal::access;
   Adam() { }
@@ -440,9 +462,10 @@ CEREAL_REGISTER_TYPE(autograd::Adam);
 CEREAL_REGISTER_POLYMORPHIC_RELATION(autograd::OptimizerImpl, autograd::Adam);
 
 namespace cereal {
+
 // Gradients will not be saved for variables
 template <class Archive>
-void save(Archive & archive, at::Tensor const & tensor) { 
+void save(Archive & archive, at::Tensor const & tensor) {
   if (!tensor.defined()) {
     auto type = at::ScalarType::Undefined;
     archive(CEREAL_NVP(type));
@@ -461,7 +484,7 @@ void save(Archive & archive, at::Tensor const & tensor) {
   at::Backend backend = tensor.type().backend();
 
   archive(CEREAL_NVP(backend), CEREAL_NVP(sizes), CEREAL_NVP(size));
-  archive.saveBinary(contig.storage()->data(), size); 
+  archive.saveBinary(contig.storage()->data(), size);
 }
 
 /**
@@ -483,7 +506,7 @@ void load(Archive & archive, at::Tensor & tensor) {
   auto sizes = std::vector<int64_t>();
   auto buf = std::vector<uint8_t>();
   uint64_t size;
-  archive(CEREAL_NVP(backend), CEREAL_NVP(sizes), CEREAL_NVP(size)); 
+  archive(CEREAL_NVP(backend), CEREAL_NVP(sizes), CEREAL_NVP(size));
 
   if (!tensor.defined() || tensor.type().scalarType() != type) {
     tensor = at::getType(backend, type).tensor();
@@ -498,10 +521,11 @@ void load(Archive & archive, at::Tensor & tensor) {
     tensor.resize_(sizes);
     archive.loadBinary(tensor.storage()->data(), size);
   }
-} 
+}
 
 template <class Archive>
 void load(Archive & archive, tag::Variable & var) {
   load(archive, var.data());
-} 
+}
+
 }  // namespace cereal
