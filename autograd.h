@@ -313,6 +313,28 @@ class Conv3d : public Conv {
   Conv3d(uint32_t i, uint32_t o, IntVec ks) : Conv(3, i, o, ks) { }
 };
 
+AUTOGRAD_CONTAINER_CLASS(BatchNorm) {
+ public:
+  BatchNorm(uint32_t num_features)
+    : num_features_(num_features) {}
+
+  AUTOGRAD_KWARG(BatchNorm, double, eps, 1e-5, 1e-5)
+  AUTOGRAD_KWARG(BatchNorm, double, momentum, 0.1, 0.1)
+  AUTOGRAD_KWARG(BatchNorm, bool, affine, true, true)
+  AUTOGRAD_KWARG(BatchNorm, bool, stateful, false, true)
+
+  void reset_parameters() override;
+  variable_list forward(variable_list) override;
+  void initialize_parameters() override;
+
+  Variable weight;
+  Variable bias;
+  Variable running_mean;
+  Variable running_var;
+
+ protected:
+  uint32_t num_features_;
+};
 
 AUTOGRAD_CONTAINER_CLASS(Dropout) {
  public:
