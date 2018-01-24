@@ -428,7 +428,6 @@ AUTOGRAD_OPTIMIZER_CLASS(SGD) {
 
 AUTOGRAD_OPTIMIZER_CLASS(Adam) {
  public:
-  using OptimizerImpl::OptimizerImpl;
   Adam(Container model, double lr) : Optimizer_CRTP(model), lr_(lr) { }
   AUTOGRAD_KWARG(Adam, double, beta1, 0.9, 0.9);
   AUTOGRAD_KWARG(Adam, double, beta2, 0.999, 0.999);
