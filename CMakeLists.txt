@@ -45,6 +45,10 @@ ADD_CUSTOM_COMMAND(
 )
 ADD_CUSTOM_COMMAND(
   TARGET autogradpp PRE_BUILD
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/lib"
+)
+ADD_CUSTOM_COMMAND(
+  TARGET autogradpp PRE_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/pytorch/build/lib*/torch/lib/libshm.*" "${CMAKE_BINARY_DIR}/lib"
 )
 ADD_LIBRARY(libpythpp SHARED IMPORTED)
