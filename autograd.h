@@ -411,6 +411,7 @@ AUTOGRAD_OPTIMIZER_CLASS(SGD) {
   AUTOGRAD_KWARG(SGD, double, dampening, 0, 0);
   AUTOGRAD_KWARG(SGD, double, weight_decay, 0, 0);
   AUTOGRAD_KWARG(SGD, bool, nesterov, false, true);
+  double lr_;
   void step() override;
   void init_state() override;
 
@@ -422,7 +423,6 @@ AUTOGRAD_OPTIMIZER_CLASS(SGD) {
  private:
   friend class cereal::access;
   SGD() { }
-  double lr_;
   std::unordered_map<std::string, at::Tensor> momentum_buffers_;
 };
 
@@ -433,6 +433,7 @@ AUTOGRAD_OPTIMIZER_CLASS(Adam) {
   AUTOGRAD_KWARG(Adam, double, beta2, 0.999, 0.999);
   AUTOGRAD_KWARG(Adam, double, weight_decay, 0, 0);
   AUTOGRAD_KWARG(Adam, double, eps, 1e-8, 1e-8);
+  double lr_;
   void step() override;
   void init_state() override;
 
@@ -446,7 +447,6 @@ AUTOGRAD_OPTIMIZER_CLASS(Adam) {
  private:
   friend class cereal::access;
   Adam() { }
-  double lr_;
   std::unordered_map<std::string, int> step_buffer_;
   std::unordered_map<std::string, at::Tensor> exp_avg_buffer_;
   std::unordered_map<std::string, at::Tensor> exp_avg_sq_buffer_;
