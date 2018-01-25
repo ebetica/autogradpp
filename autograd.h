@@ -426,6 +426,29 @@ AUTOGRAD_OPTIMIZER_CLASS(SGD) {
   std::unordered_map<std::string, at::Tensor> momentum_buffers_;
 };
 
+AUTOGRAD_OPTIMIZER_CLASS(Adagrad) {
+ public:
+  Adagrad(Container model, double lr) : Optimizer_CRTP(model), lr_(lr) { }
+  AUTOGRAD_KWARG(Adagrad, double, lr_decay, 0, 0);
+  AUTOGRAD_KWARG(Adagrad, double, weight_decay, 0, 0);
+  double lr_;
+  void step() override;
+  void init_state() override;
+
+  template <class Archive>
+  void serialize(Archive & ar) {
+    ar(CEREAL_NVP(sum_));
+    ar(CEREAL_NVP(step_));
+  }
+
+ private:
+  friend class cereal::access;
+  Adagrad() { }
+  std::unordered_map<std::string, at::Tensor> sum_;
+  std::unordered_map<std::string, double> step_;
+};
+
+
 AUTOGRAD_OPTIMIZER_CLASS(Adam) {
  public:
   Adam(Container model, double lr) : Optimizer_CRTP(model), lr_(lr) { }

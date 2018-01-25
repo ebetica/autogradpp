@@ -386,6 +386,40 @@ void SGD::init_state() {
   momentum_buffers_.clear();
 }
 
+/// Adapted from
+/// https://github.com/pytorch/pytorch/blob/master/torch/optim/adagrad.py
+void Adagrad::step() {
+  for (auto& pair : model_->parameters()) {
+    auto& name = pair.first;
+    auto& grad = pair.second.grad();
+    auto& p = pair.second.data();
+    if (!grad.defined()) continue;
+
+    auto d_p = grad.data();
+    if (weight_decay_ > 0) {
+      d_p.add_(p, weight_decay_);
+    };
+    auto &step = step_[name];
+    step += 1.0;
+    auto clr = lr_ / (1.0 + (step - 1.0) * lr_decay_);
+    at::Tensor buf;
+    if (sum_.find(name) == sum_.end()) {
+      buf = sum_[name] = at::zeros_like(p);
+    } else {
+      buf = sum_[name];
+    }
+
+    buf.addcmul_(d_p, d_p, 1.0);
+    at::Tensor std = buf.sqrt().add_(1e-10);
+    p.addcdiv_(d_p, std, -clr);
+  }
+}
+
+void Adagrad::init_state() {
+  sum_.clear();
+  step_.clear();
+}
+
 void Adam::step() {
   for (auto& pair : model_->parameters()) {
     auto& name = pair.first;
