@@ -359,7 +359,9 @@ void SGD::step() {
     if (!grad.defined()) continue;
 
     auto d_p = grad.data();
-    d_p.add_(p, weight_decay_);
+    if (weight_decay_ > 0) {
+      d_p.add_(p, weight_decay_);
+    };
 
     if (momentum_ != 0) {
       at::Tensor buf;
