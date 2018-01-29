@@ -2,6 +2,7 @@
 #include <map>
 #include <regex>
 #include <math.h>
+#include "cereal/archives/portable_binary.hpp"
 #include "autograd.h"
 using namespace autograd;
 
@@ -421,6 +422,44 @@ std::map<std::string, std::function<void()>> construct_tests() {
    load(ss, &y);
 
    EXPECT(!y.defined());
+ };
+
+ tests["autograd/serialization/binary"] = []() {
+   auto x = at::CPU(at::kFloat).randn({5, 5});
+   auto y = at::Tensor();
+
+   std::stringstream ss;
+   {
+     cereal::BinaryOutputArchive archive(ss);
+     archive(x);
+   }
+   {
+     cereal::BinaryInputArchive archive(ss);
+     archive(y);
+   }
+
+   EXPECT(y.defined());
+   EXPECT(x.sizes().vec() == y.sizes().vec());
+   EXPECT(x.eq(y).all());
+ };
+
+ tests["autograd/serialization/portable_binary"] = []() {
+   auto x = at::CPU(at::kFloat).randn({5, 5});
+   auto y = at::Tensor();
+
+   std::stringstream ss;
+   {
+     cereal::PortableBinaryOutputArchive archive(ss);
+     archive(x);
+   }
+   {
+     cereal::PortableBinaryInputArchive archive(ss);
+     archive(y);
+   }
+
+   EXPECT(y.defined());
+   EXPECT(x.sizes().vec() == y.sizes().vec());
+   EXPECT(x.eq(y).all());
  };
 
  tests["autograd/serialization/xor"] = []() {

@@ -485,6 +485,37 @@ CEREAL_REGISTER_POLYMORPHIC_RELATION(autograd::OptimizerImpl, autograd::Adam);
 
 namespace cereal {
 
+namespace agimpl {
+
+template <class Archive>
+void saveBinary(Archive & archive, void const * data, std::size_t size) {
+  // In general, there's no direct `saveBinary`-like method on archives
+  std::vector<char> v(reinterpret_cast<char const*>(data),
+      reinterpret_cast<char const*>(data) + size);
+  archive(v);
+}
+template <>
+inline void saveBinary(BinaryOutputArchive & archive, void const * data,
+    std::size_t size) {
+  // Writes to output stream without extra copy
+  archive.saveBinary(data, size);
+}
+
+template <class Archive>
+void loadBinary(Archive & archive, void * data, std::size_t size) {
+  // In general, there's no direct `loadBinary`-like method on archives
+  std::vector<char> v(size);
+  archive(v);
+  std::memcpy(data, v.data(), size);
+}
+template <>
+inline void loadBinary(BinaryInputArchive & archive, void * data, std::size_t size) {
+  // Read from input stream without extra copy
+  archive.loadBinary(data, size);
+}
+
+} // namespace agimpl
+
 // Gradients will not be saved for variables
 template <class Archive>
 void save(Archive & archive, at::Tensor const & tensor) {
@@ -506,7 +537,7 @@ void save(Archive & archive, at::Tensor const & tensor) {
   at::Backend backend = tensor.type().backend();
 
   archive(CEREAL_NVP(backend), CEREAL_NVP(sizes), CEREAL_NVP(size));
-  archive.saveBinary(contig.storage()->data(), size);
+  agimpl::saveBinary(archive, contig.storage()->data(), size);
 }
 
 /**
@@ -537,11 +568,11 @@ void load(Archive & archive, at::Tensor & tensor) {
     // should actually use cudamemcpy probably
     auto cputensor = at::CPU(tensor.type().scalarType()).tensor(sizes);
     tensor.resize_(sizes);
-    archive.loadBinary(cputensor.storage()->data(), size);
+    agimpl::loadBinary(archive, cputensor.storage()->data(), size);
     tensor.copy_(cputensor);
   } else {
     tensor.resize_(sizes);
-    archive.loadBinary(tensor.storage()->data(), size);
+    agimpl::loadBinary(archive, tensor.storage()->data(), size);
   }
 }
 
