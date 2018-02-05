@@ -43,7 +43,7 @@ AUTOGRAD_CONTAINER_CLASS(MyModel) {
 
 Some things are not implemented:
 - Batchnorm
-- Only SGD and Adam are implemented: the rest of the optimizers are just copying Python code from PyTorch over.
+- Only SGD, Adagrad, and Adam are implemented: the rest of the optimizers are just copying Python code from PyTorch over.
 
 Some things to be careful of:
 - Variable.detach does not do what you think it does. Better to do Variable(old.data())
