@@ -475,7 +475,9 @@ AUTOGRAD_OPTIMIZER_CLASS(Adam) {
   std::unordered_map<std::string, at::Tensor> exp_avg_sq_buffer_;
 };
 
-}  // namespace autograd
+void setSeed(int seed);
+
+} // namespace autograd
 
 // This is super ugly and I don't know how to simplify it
 CEREAL_REGISTER_TYPE(autograd::SGD);
