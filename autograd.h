@@ -480,6 +480,8 @@ AUTOGRAD_OPTIMIZER_CLASS(Adam) {
 // This is super ugly and I don't know how to simplify it
 CEREAL_REGISTER_TYPE(autograd::SGD);
 CEREAL_REGISTER_POLYMORPHIC_RELATION(autograd::OptimizerImpl, autograd::SGD);
+CEREAL_REGISTER_TYPE(autograd::Adagrad);
+CEREAL_REGISTER_POLYMORPHIC_RELATION(autograd::OptimizerImpl, autograd::Adagrad);
 CEREAL_REGISTER_TYPE(autograd::Adam);
 CEREAL_REGISTER_POLYMORPHIC_RELATION(autograd::OptimizerImpl, autograd::Adam);
 
