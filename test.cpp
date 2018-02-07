@@ -845,7 +845,30 @@ tests["autograd/~integration/cartpole"] = []() {
 
 };
 
- return tests;
+tests["autograd/random/seed_cpu"] = []() {
+  int size = 100;
+  setSeed(7);
+  auto x1 = Var(at::CPU(at::kFloat).randn({size}));
+  setSeed(7);
+  auto x2 = Var(at::CPU(at::kFloat).randn({size}));
+
+  auto l_inf = (x1.data() - x2.data()).abs().max().toCFloat();
+  EXPECT(l_inf < 1e-10);
+};
+
+tests["autograd/random/seed_cuda"] = []() {
+  CUDA_GUARD;
+  int size = 100;
+  setSeed(7);
+  auto x1 = Var(at::CUDA(at::kFloat).randn({size}));
+  setSeed(7);
+  auto x2 = Var(at::CUDA(at::kFloat).randn({size}));
+
+  auto l_inf = (x1.data() - x2.data()).abs().max().toCFloat();
+  EXPECT(l_inf < 1e-10);
+};
+
+return tests;
 }
 
 int main(int argc, char** argv) {
