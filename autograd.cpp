@@ -341,7 +341,7 @@ void OptimizerImpl::zero_grad() {
   for (auto p : model_->parameters()) {
     auto& grad = p.second.grad();
     if (grad.defined()) {
-      grad.detach_();
+      grad = grad.detach();
       grad.data().zero_();
     }
   }
