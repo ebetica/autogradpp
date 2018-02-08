@@ -464,12 +464,12 @@ void Adam::init_state() {
   exp_avg_sq_buffer_.clear();
 }
 
-void setSeed(int seed) {
+void setSeed(uint64_t seed) {
   for (auto i = 0; i < static_cast<int>(at::Backend::NumOptions); i++) {
     try {
       at::globalContext()
           .defaultGenerator(static_cast<at::Backend>(i))
-          .manualSeed(static_cast<uint64_t>(seed));
+          .manualSeed(seed);
     } catch (const std::runtime_error &e) {
       // defaultGenerator() will throw a runtime error for backends that are not
       // available (e.g. CUDA on non-GPU machines).
