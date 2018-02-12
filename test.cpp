@@ -400,6 +400,28 @@ std::map<std::string, std::function<void()>> construct_tests() {
    test_optimizer_xor(optim, model);
  };
 
+ tests["autograd/optim/rmsprop"] = []() {
+   {
+     auto model = ContainerList()
+       .append(Linear(2, 8).make())
+       .append(Linear(8, 1).make())
+       .make();
+
+     auto optim = RMSprop(model, 1e-1).momentum(0.9).weight_decay(1e-6).make();
+     test_optimizer_xor(optim, model);
+   }
+
+   {
+     auto model = ContainerList()
+       .append(Linear(2, 8).make())
+       .append(Linear(8, 1).make())
+       .make();
+
+     auto optim = RMSprop(model, 1e-1).centered().make();
+     test_optimizer_xor(optim, model);
+   }
+ };
+
  tests["autograd/optim/adam"] = []() {
    auto model = ContainerList()
      .append(Linear(2, 8).make())

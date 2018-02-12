@@ -448,6 +448,35 @@ AUTOGRAD_OPTIMIZER_CLASS(Adagrad) {
   std::unordered_map<std::string, double> step_;
 };
 
+AUTOGRAD_OPTIMIZER_CLASS(RMSprop) {
+ public:
+  RMSprop(Container model, double lr) : Optimizer_CRTP(model), lr_(lr) { }
+  AUTOGRAD_KWARG(RMSprop, double, alpha, 0.99, 0.99);
+  AUTOGRAD_KWARG(RMSprop, double, eps, 1e-8, 1e-8);
+  AUTOGRAD_KWARG(RMSprop, double, weight_decay, 0, 0);
+  AUTOGRAD_KWARG(RMSprop, double, momentum, 0, 0);
+  AUTOGRAD_KWARG(RMSprop, bool, centered, false, true);
+
+  double lr_;
+  void step() override;
+  void init_state() override;
+
+  template <class Archive>
+  void serialize(Archive & ar) {
+    ar(CEREAL_NVP(square_avg_buffer_));
+    ar(CEREAL_NVP(momentum_buffer_));
+    ar(CEREAL_NVP(grad_avg_buffer_));
+  }
+
+ private:
+  friend class cereal::access;
+  RMSprop() { }
+  std::unordered_map<std::string, at::Tensor> square_avg_buffer_;
+  std::unordered_map<std::string, at::Tensor> momentum_buffer_;
+  std::unordered_map<std::string, at::Tensor> grad_avg_buffer_;
+};
+
+
 
 AUTOGRAD_OPTIMIZER_CLASS(Adam) {
  public:
@@ -484,6 +513,8 @@ CEREAL_REGISTER_TYPE(autograd::SGD);
 CEREAL_REGISTER_POLYMORPHIC_RELATION(autograd::OptimizerImpl, autograd::SGD);
 CEREAL_REGISTER_TYPE(autograd::Adagrad);
 CEREAL_REGISTER_POLYMORPHIC_RELATION(autograd::OptimizerImpl, autograd::Adagrad);
+CEREAL_REGISTER_TYPE(autograd::RMSprop);
+CEREAL_REGISTER_POLYMORPHIC_RELATION(autograd::OptimizerImpl, autograd::RMSprop);
 CEREAL_REGISTER_TYPE(autograd::Adam);
 CEREAL_REGISTER_POLYMORPHIC_RELATION(autograd::OptimizerImpl, autograd::Adam);
 

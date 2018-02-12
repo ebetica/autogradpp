@@ -43,6 +43,6 @@ AUTOGRAD_CONTAINER_CLASS(MyModel) {
 
 Some things are not implemented:
 - Batchnorm
-- Only SGD, Adagrad, and Adam are implemented: the rest of the optimizers are just copying Python code from PyTorch over.
+- SGD, Adagrad, RMSprop, and Adam are implemented: the rest of the optimizers are just copying Python code from PyTorch over.
 
 Otherwise, everything else works. There may be breaking API changes.
