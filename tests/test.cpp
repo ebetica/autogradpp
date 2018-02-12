@@ -665,10 +665,10 @@ std::map<std::string, std::function<void()>> construct_tests() {
      return data.toBackend(useGPU ? at::kCUDA : at::kCPU);
    };
 
-   auto trdata = readData("mnist/train-images-idx3-ubyte");
-   auto trlabel = readLabels("mnist/train-labels-idx1-ubyte");
-   auto tedata = readData("mnist/t10k-images-idx3-ubyte");
-   auto telabel = readLabels("mnist/t10k-labels-idx1-ubyte");
+   auto trdata = readData("tests/mnist/train-images-idx3-ubyte");
+   auto trlabel = readLabels("tests/mnist/train-labels-idx1-ubyte");
+   auto tedata = readData("tests/mnist/t10k-images-idx3-ubyte");
+   auto telabel = readLabels("tests/mnist/t10k-labels-idx1-ubyte");
 
    if (useGPU) {
      model->cuda();

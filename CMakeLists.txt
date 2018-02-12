@@ -7,12 +7,14 @@ SET(CMAKE_POSITION_INDEPENDENT_CODE ON)
 SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake" "${CMAKE_SOURCE_DIR}/cmake/FindCUDA")
 
 ### This library exports: 
-ADD_LIBRARY(autogradpp STATIC autograd.cpp)
-ADD_EXECUTABLE(autograd_test test.cpp)
-ADD_CUSTOM_COMMAND(
-  TARGET autograd_test PRE_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/mnist" "${CMAKE_BINARY_DIR}/mnist"
+ADD_LIBRARY(autogradpp STATIC 
+  src/detail.cpp
+  src/containers.cpp
+  src/optimizers.cpp
 )
+
+## Build subdirectories
+ADD_SUBDIRECTORY(tests)
 
 ### ATen
 FIND_PATH(ATEN_INCLUDE_DIR ATen/ATen.h PATHS "${CMAKE_CURRENT_SOURCE_DIR}/pytorch/torch/lib/include/" NO_DEFAULT_PATH)
@@ -34,8 +36,9 @@ SET_TARGET_PROPERTIES(ATen PROPERTIES
 FIND_PACKAGE(PythonLibs REQUIRED)
 TARGET_INCLUDE_DIRECTORIES(autogradpp PUBLIC 
   ${PYTHON_INCLUDE_DIRS} 
-  "${CMAKE_CURRENT_SOURCE_DIR}/pytorch"
   "${CMAKE_CURRENT_SOURCE_DIR}"
+  "${CMAKE_CURRENT_SOURCE_DIR}/pytorch"
+  "${CMAKE_CURRENT_SOURCE_DIR}/include"
 )
 
 ### Copy over all the relevant .so files
@@ -68,8 +71,6 @@ ENDIF(APPLE)
 
 ### Link stuff
 TARGET_LINK_LIBRARIES(autogradpp ATen libpythpp ${PYTHON_LIBRARIES})
-
-TARGET_LINK_LIBRARIES(autograd_test autogradpp)
 
 ### Optionally, link CUDA
 FIND_PACKAGE(CUDA)
