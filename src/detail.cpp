@@ -1,3 +1,5 @@
+#include <ATen/Config.h>
+
 #include <algorithm>
 #include <cmath>
 #include <functional>
@@ -24,7 +26,6 @@ void backward(Tensor loss, bool keep_graph) {
   backward(tmp, keep_graph);
 }
 
-
 void setSeed(uint64_t seed) {
   for (auto i = 0; i < static_cast<int>(at::Backend::NumOptions); i++) {
     try {
@@ -39,5 +40,12 @@ void setSeed(uint64_t seed) {
     }
   }
 };
+
+bool hasCuda() {
+  return AT_CUDA_ENABLED();
+}
+bool hasCudnn() {
+  return AT_CUDNN_ENABLED();
+}
 
 } // namespace autograd
