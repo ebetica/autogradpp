@@ -114,6 +114,7 @@ AUTOGRAD_OPTIMIZER_CLASS(Adam) {
   AUTOGRAD_KWARG(Adam, double, beta2, 0.999, 0.999);
   AUTOGRAD_KWARG(Adam, double, weight_decay, 0, 0);
   AUTOGRAD_KWARG(Adam, double, eps, 1e-8, 1e-8);
+  AUTOGRAD_KWARG(Adam, bool, amsgrad, false, true);
   double lr_;
   void step() override;
   void init_state() override;
@@ -122,7 +123,8 @@ AUTOGRAD_OPTIMIZER_CLASS(Adam) {
   void serialize(Archive & ar) {
     ar(CEREAL_NVP(step_buffer_),
        CEREAL_NVP(exp_avg_buffer_),
-       CEREAL_NVP(exp_avg_sq_buffer_));
+       CEREAL_NVP(exp_avg_sq_buffer_),
+       CEREAL_NVP(max_exp_avg_sq_buffer_));
   }
 
  private:
@@ -131,6 +133,7 @@ AUTOGRAD_OPTIMIZER_CLASS(Adam) {
   std::unordered_map<std::string, int> step_buffer_;
   std::unordered_map<std::string, at::Tensor> exp_avg_buffer_;
   std::unordered_map<std::string, at::Tensor> exp_avg_sq_buffer_;
+  std::unordered_map<std::string, at::Tensor> max_exp_avg_sq_buffer_;
 };
 
 } // namespace autograd
