@@ -432,6 +432,16 @@ std::map<std::string, std::function<void()>> construct_tests() {
    test_optimizer_xor(optim, model);
  };
 
+ tests["autograd/optim/amsgrad"] = []() {
+   auto model = ContainerList()
+     .append(Linear(2, 8).make())
+     .append(Linear(8, 1).make())
+     .make();
+
+   auto optim = Adam(model, 0.1).weight_decay(1e-6).amsgrad().make();
+   test_optimizer_xor(optim, model);
+ };
+
  tests["autograd/serialization/undefined"] = []() {
    auto x = at::Tensor();
 
