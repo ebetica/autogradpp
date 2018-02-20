@@ -133,9 +133,9 @@ void test_optimizer_xor(Optimizer optim, std::shared_ptr<ContainerList> model) {
      optim->step();
 
      running_loss = running_loss * 0.99 + loss.data().sum().toCFloat() * 0.01;
-     EXPECT(epoch < 3000);
      epoch++;
    }
+   EXPECT(epoch < 3000);
  };
 
 std::map<std::string, std::function<void()>> construct_tests() {
