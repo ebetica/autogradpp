@@ -1,4 +1,17 @@
-ADD_EXECUTABLE(autograd_test test.cpp)
+ADD_EXECUTABLE(autograd_test
+  test.cpp
+  container_t.cpp
+  misc_t.cpp
+  rnn_t.cpp
+  integration_t.cpp
+  optim_t.cpp
+  serialization_t.cpp
+)
+
+TARGET_COMPILE_OPTIONS(autograd_test
+  PRIVATE
+    -Dlest_FEATURE_AUTO_REGISTER=1
+)
 
 ADD_CUSTOM_COMMAND(
   TARGET autograd_test PRE_BUILD
