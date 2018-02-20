@@ -1,8 +1,12 @@
+#include <ATen/Config.h>
+
 #include <functional>
 #include <map>
 #include <regex>
 #include <math.h>
+
 #include "cereal/archives/portable_binary.hpp"
+
 #include "autograd.h"
 using namespace autograd;
 
@@ -12,11 +16,9 @@ using namespace autograd;
 #define STR(x) STR_HELPER(x)
 #define EXPECT(CODE) if (CODE); else { throw std::runtime_error(__FILE__ ":" STR(__LINE__) ": " #CODE); }
 
-#if AT_CUDA_ENABLED()
-#define CUDA_GUARD
-#else
-#define CUDA_GUARD std::cerr << "No cuda, skipping test" << std::endl; return
-#endif
+#define CUDA_GUARD if (!hasCuda()) {\
+  std::cerr << "No cuda, skipping test" << std::endl; return;\
+}
 
 class CartPole {
   // Translated from openai/gym's cartpole.py
@@ -158,7 +160,7 @@ std::map<std::string, std::function<void()>> construct_tests() {
 
     backward(s);
     EXPECT(y.ndimension() == 4);
-    EXPECT(s.ndimension() == 1);
+    EXPECT(s.ndimension() == 0);
     for (auto i = 0; i < 4; i++) {
       EXPECT(y.size(i) == 2);
     }
@@ -174,7 +176,7 @@ std::map<std::string, std::function<void()>> construct_tests() {
 
     backward(s);
     EXPECT(y.ndimension() == 4);
-    EXPECT(s.ndimension() == 1);
+    EXPECT(s.ndimension() == 0);
     for (auto i = 0; i < 4; i++) {
       EXPECT(y.size(i) == 2);
     }
@@ -190,7 +192,7 @@ std::map<std::string, std::function<void()>> construct_tests() {
 
     backward(s);
     EXPECT(y.ndimension() == 4);
-    EXPECT(s.ndimension() == 1);
+    EXPECT(s.ndimension() == 0);
     for (auto i = 0; i < 3; i++) {
       EXPECT(y.size(i) == 2);
     }
@@ -206,7 +208,7 @@ std::map<std::string, std::function<void()>> construct_tests() {
 
     backward(s);
     EXPECT(y.ndimension() == 5);
-    EXPECT(s.ndimension() == 1);
+    EXPECT(s.ndimension() == 0);
     for (auto i = 0; i < 5; i++) {
       EXPECT(y.size(i) == 2);
     }
@@ -223,7 +225,7 @@ std::map<std::string, std::function<void()>> construct_tests() {
 
    backward(s);
    EXPECT(y.ndimension() == 2);
-   EXPECT(s.ndimension() == 1);
+   EXPECT(s.ndimension() == 0);
    EXPECT(y.size(0) == 10);
    EXPECT(y.size(1) == 2);
 
@@ -278,7 +280,7 @@ std::map<std::string, std::function<void()>> construct_tests() {
 
    backward(s);
    EXPECT(y.ndimension() == 2);
-   EXPECT(s.ndimension() == 1);
+   EXPECT(s.ndimension() == 0);
    EXPECT(y.size(0) == 10);
    EXPECT(y.size(1) == 2);
 
@@ -308,7 +310,7 @@ std::map<std::string, std::function<void()>> construct_tests() {
 
    backward(s);
    EXPECT(y.ndimension() == 2);
-   EXPECT(s.ndimension() == 1);
+   EXPECT(s.ndimension() == 0);
    EXPECT(y.size(0) == 10);
    EXPECT(y.size(1) == 2);
 
@@ -326,7 +328,7 @@ std::map<std::string, std::function<void()>> construct_tests() {
 
    backward(s);
    EXPECT(y.ndimension() == 2);
-   EXPECT(s.ndimension() == 1);
+   EXPECT(s.ndimension() == 0);
    EXPECT(y.size(0) == 10);
    EXPECT(y.size(1) == 2);
 
@@ -472,7 +474,7 @@ std::map<std::string, std::function<void()>> construct_tests() {
 
    EXPECT(y.defined());
    EXPECT(x.sizes().vec() == y.sizes().vec());
-   EXPECT(x.eq(y).all());
+   EXPECT(x.allclose(y));
  };
 
  tests["autograd/serialization/portable_binary"] = []() {
@@ -491,7 +493,7 @@ std::map<std::string, std::function<void()>> construct_tests() {
 
    EXPECT(y.defined());
    EXPECT(x.sizes().vec() == y.sizes().vec());
-   EXPECT(x.eq(y).all());
+   EXPECT(x.allclose(y));
  };
 
  tests["autograd/serialization/xor"] = []() {
@@ -835,7 +837,7 @@ tests["autograd/~integration/cartpole"] = []() {
       policy_loss.push_back(- r * saved_log_probs[i]);
       value_loss.push_back(at::smooth_l1_loss(saved_values[i], Var(at::CPU(at::kFloat).scalarTensor(at::Scalar(rewards[i])), false)));
     }
-    auto loss = at::cat(policy_loss).sum() + at::cat(value_loss).sum();
+    auto loss = at::stack(policy_loss).sum() + at::stack(value_loss).sum();
 
     optim->zero_grad();
     backward(loss);

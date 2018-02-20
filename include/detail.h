@@ -55,4 +55,7 @@ class no_grad_guard {
 
 void setSeed(uint64_t seed);
 
+bool hasCuda();
+bool hasCudnn();
+
 } // namespace autograd

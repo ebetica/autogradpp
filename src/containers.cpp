@@ -1,6 +1,5 @@
 #include "containers.h"
 
-
 namespace autograd {
 std::map<std::string, Variable> ContainerImpl::parameters() const {
   std::map<std::string, Variable> ret;
@@ -230,7 +229,7 @@ variable_list BatchNorm::forward(variable_list inputs) {
       weight, bias,
       running_mean, running_var,
       train_, momentum_, eps_,
-      AT_CUDNN_ENABLED());
+      hasCudnn());
 
   return variable_list({output});
 }
