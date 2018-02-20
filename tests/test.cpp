@@ -464,7 +464,7 @@ std::map<std::string, std::function<void()>> construct_tests() {
 
    EXPECT(y.defined());
    EXPECT(x.sizes().vec() == y.sizes().vec());
-   EXPECT(x.eq(y).all().toCInt());
+   EXPECT(x.allclose(y));
  };
 
  tests["autograd/serialization/portable_binary"] = []() {
@@ -483,7 +483,7 @@ std::map<std::string, std::function<void()>> construct_tests() {
 
    EXPECT(y.defined());
    EXPECT(x.sizes().vec() == y.sizes().vec());
-   EXPECT(x.eq(y).all().toCInt());
+   EXPECT(x.allclose(y));
  };
 
  tests["autograd/serialization/xor"] = []() {
