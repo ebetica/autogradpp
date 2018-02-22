@@ -347,7 +347,7 @@ variable_list RNNBase<Derived>::autograd_forward(variable_list inputs) {
   auto inp = inputs[0];
 
   std::vector<Tensor> hidden;
-  for (auto i = 0; i < nlayers_; i++) {
+  for (size_t i = 0; i < nlayers_; i++) {
     hidden.push_back(inputs[1].defined() 
         ? inputs[1][i] 
         : tag::Variable());
@@ -399,7 +399,7 @@ bool RNNBase<Derived>::flatten_parameters() {
   }
 
   std::vector<Tensor> weight_list;
-  for (auto i = 0; i < nlayers_; i++) {
+  for (size_t i = 0; i < nlayers_; i++) {
     weight_list.push_back(i2h[i]->param("weight"));
     weight_list.push_back(h2h[i]->param("weight"));
     if (!no_bias_) {
@@ -430,7 +430,7 @@ bool RNNBase<Derived>::flatten_parameters() {
 template <typename Derived>
 variable_list RNNBase<Derived>::CUDNN_forward(variable_list inputs) {
   std::vector<Tensor> weight_list;
-  for (auto i = 0; i < nlayers_; i++) {
+  for (size_t i = 0; i < nlayers_; i++) {
     weight_list.push_back(i2h[i]->param("weight"));
     weight_list.push_back(h2h[i]->param("weight"));
     if (!no_bias_) {
