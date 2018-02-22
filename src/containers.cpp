@@ -28,14 +28,7 @@ void ContainerImpl::cuda() {
   for (auto& pair : children_) {
     pair.second->cuda();
   }
-  // Can't do in place operation since .toBackend isn't implemented for variables
-  /*
-  for (auto& pair : params_) {
-    Variable(pair.second.toBackend(at::kCUDA)).detach_();
-  }
-  */
   cuda_ = true;
-  // So we hack it...
   auto copied = params_;
   params_.clear();
   initialize_parameters();
@@ -49,7 +42,6 @@ void ContainerImpl::cpu() {
     pair.second->cpu();
   }
   cuda_ = false;
-  // So we hack it...
   auto copied = params_;
   params_.clear();
   initialize_parameters();
