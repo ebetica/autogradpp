@@ -16,7 +16,7 @@ std::map<std::string, Variable> ContainerImpl::parameters() const {
   return ret;
 }
 
-Variable& ContainerImpl::param(std::string name) {
+Variable& ContainerImpl::param(std::string const& name) {
   auto it = params_.find(name);
   if (it == params_.end()) {
     throw std::runtime_error("No such param: " + name);

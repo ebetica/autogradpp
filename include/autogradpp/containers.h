@@ -20,7 +20,7 @@ class ContainerImpl {
   virtual variable_list forward(variable_list) = 0;
 
   std::map<std::string, Variable> parameters() const;
-  Variable& param(std::string);
+  Variable& param(std::string const&);
 
   virtual void cuda();
   virtual void cpu();
