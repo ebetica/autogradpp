@@ -65,14 +65,6 @@ ADD_LIBRARY(libpythpp SHARED IMPORTED)
 SET_TARGET_PROPERTIES(libpythpp PROPERTIES IMPORTED_NO_SONAME 1
   IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/libpythpp.so")
 
-ADD_LIBRARY(libgloo SHARED IMPORTED)
-SET_TARGET_PROPERTIES(libgloo PROPERTIES IMPORTED_NO_SONAME 1
-  IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/pytorch/torch/lib/libgloo.so")
-
-ADD_LIBRARY(libgloo_cuda SHARED IMPORTED)
-SET_TARGET_PROPERTIES(libgloo_cuda PROPERTIES IMPORTED_NO_SONAME 1
-  IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/pytorch/torch/lib/libgloo_cuda.so")
-
 IF(APPLE)
   # Set RPATHs for OSX...
   ADD_CUSTOM_COMMAND(
@@ -82,10 +74,16 @@ IF(APPLE)
   # Unfortunately this won't be picked up in the initial build...
   SET_TARGET_PROPERTIES(libpythpp PROPERTIES
     INTERFACE_LINK_LIBRARIES "-Wl,-rpath ${CMAKE_BINARY_DIR}")
+ELSE(APPLE)
+  ADD_LIBRARY(libgloo SHARED IMPORTED)
+  SET_TARGET_PROPERTIES(libgloo PROPERTIES IMPORTED_NO_SONAME 1
+    IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/pytorch/torch/lib/libgloo.so")
+
+  TARGET_LINK_LIBRARIES(autogradpp libgloo)
 ENDIF(APPLE)
 
 ### Link stuff
-TARGET_LINK_LIBRARIES(autogradpp ATen libpythpp libgloo libgloo_cuda ${PYTHON_LIBRARIES})
+TARGET_LINK_LIBRARIES(autogradpp ATen libpythpp ${PYTHON_LIBRARIES})
 
 ### Optionally, link CUDA
 FIND_PACKAGE(CUDA)
@@ -104,6 +102,12 @@ IF(CUDA_FOUND)
       TARGET autogradpp PRE_BUILD
       COMMAND install_name_tool -id "@rpath/libpythpp_nvrtc.so" -add_rpath "${CMAKE_BINARY_DIR}" "${CMAKE_BINARY_DIR}/libpythpp_nvrtc.so"
     )
+  ELSE(APPLE)
+    ADD_LIBRARY(libgloo_cuda SHARED IMPORTED)
+    SET_TARGET_PROPERTIES(libgloo_cuda PROPERTIES IMPORTED_NO_SONAME 1
+      IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/pytorch/torch/lib/libgloo_cuda.so")
+
+    TARGET_LINK_LIBRARIES(autogradpp libgloo_cuda)
   ENDIF(APPLE)
   TARGET_LINK_LIBRARIES(autogradpp libpythpp_nvrtc
     -L${CUDA_TOOLKIT_ROOT_DIR}/lib64 cuda nvrtc
