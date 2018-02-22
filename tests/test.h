@@ -1,7 +1,7 @@
 #pragma once
 
 #include "lest.hpp"
-#include "autograd.h"
+#include <autogradpp/autograd.h>
 
 using namespace autograd;
 
