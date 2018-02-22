@@ -17,7 +17,11 @@ std::map<std::string, Variable> ContainerImpl::parameters() const {
 }
 
 Variable& ContainerImpl::param(std::string name) {
-  return params_[name];
+  auto it = params_.find(name);
+  if (it == params_.end()) {
+    throw std::runtime_error("No such param: " + name);
+  }
+  return it->second;
 }
 
 void ContainerImpl::cuda() {
