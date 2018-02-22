@@ -26,7 +26,7 @@ make -j
 AUTOGRAD_CONTAINER_CLASS(MyModel) {
   // This does a 2D convolution, followed by global sum pooling, followed by a linear.
  public:
-  void initialize_parameters() override {
+  void initialize_containers() override {
     myConv_ = add(Conv2d(1, 50, 3, 3).stride(2).make(), "conv");
     myLinear_ = add(Linear(50, 1).make(), "linear");
   }
@@ -42,7 +42,8 @@ AUTOGRAD_CONTAINER_CLASS(MyModel) {
 ```
 
 Some things are not implemented:
-- Batchnorm
-- SGD, Adagrad, RMSprop, and Adam are implemented: the rest of the optimizers are just copying Python code from PyTorch over.
+- SGD, Adagrad, RMSprop, and Adam are the only optimizers implemented
+- Bidirectional, batch first, and PackedSequence are not implemented for LSTMs
+- Sparse Tensors might work but are very untested
 
-Otherwise, everything else works. There may be breaking API changes.
+Otherwise, lots of other things work. There may be breaking API changes.

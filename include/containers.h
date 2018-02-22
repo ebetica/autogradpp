@@ -12,7 +12,7 @@ class ContainerImpl {
   // Only construct parameters in initialize_parameters, and 
   // containers in initialize_containers. Most of the time, the containers are
   // the only thing you need to add.
-  // You are gauranteed that containers are added before parameters.
+  // You are guaranteed that containers are added before parameters.
   virtual void initialize_containers() { };
   virtual void initialize_parameters() { };
   virtual void reset_parameters() { };
@@ -20,7 +20,7 @@ class ContainerImpl {
   virtual variable_list forward(variable_list) = 0;
 
   std::map<std::string, Variable> parameters() const;
-  Variable param(std::string);
+  Variable& param(std::string);
 
   virtual void cuda();
   virtual void cpu();
@@ -305,7 +305,13 @@ class RNNBase : public Container_CRTP<Derived> {
   uint32_t input_size_;
   uint32_t hidden_size_;
   uint32_t gate_size_;
-  std::unordered_set<void*> data_ptrs_;
+  // This is copied from pytorch, to determine whether weights are flat for 
+  // the fast CUDNN route. Otherwise, we have to use non flattened weights, which
+  // are much slower.
+  // https://github.com/pytorch/pytorch/blob/1848cad10802db9fa0aa066d9de195958120d863/torch/nn/modules/rnn.py#L159-L165
+  // TODO Actually since we are in C++ we can probably just actually check if
+  // the parameters are flat, instead of relying on data pointers and stuff.
+  std::vector<void*> data_ptrs_;
   Variable flat_weight_;
   Container dropout_module;
 

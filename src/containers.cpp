@@ -16,7 +16,7 @@ std::map<std::string, Variable> ContainerImpl::parameters() const {
   return ret;
 }
 
-Variable ContainerImpl::param(std::string name) {
+Variable& ContainerImpl::param(std::string name) {
   return params_[name];
 }
 
@@ -70,7 +70,7 @@ void ContainerImpl::eval() {
 
 Container ContainerImpl::add(Container m, std::string const& name) {
   if (this->children_.find(name) != this->children_.end()) {
-    std::cerr << "Warning: Trying to add container that already exists" << std::endl;
+    throw std::runtime_error("Trying to add container that already exists");
   }
   this->children_[name] = std::move(m);
   return this->children_[name];
@@ -78,7 +78,7 @@ Container ContainerImpl::add(Container m, std::string const& name) {
 
 Variable& ContainerImpl::add(Variable v, std::string const& name) {
   if (this->params_.find(name) != this->params_.end()) {
-    std::cerr << "Warning: Trying to add parameter that already exists" << std::endl;
+    throw std::runtime_error("Trying to add parameter that already exists");
   }
   this->params_[name] = v;
   return this->params_[name];
@@ -426,7 +426,7 @@ bool RNNBase<Derived>::flatten_parameters() {
       false); // batch_first and bidirectional, unsupported
   }
   for (auto& p : params) {
-    data_ptrs_.insert(p.second.data().data_ptr());
+    data_ptrs_.emplace_back(p.second.data().data_ptr());
   }
   return true;
 }
@@ -457,12 +457,12 @@ variable_list RNNBase<Derived>::CUDNN_forward(variable_list inputs) {
   }
   auto dropout_state = x.type().tensor();
 
-  std::unordered_set<void*> unique_data_ptrs;
+  std::vector<void*> weight_data_ptrs;
   auto params = this->parameters();
   for (auto& p : params) {
-    unique_data_ptrs.insert(p.second.data().data_ptr());
+    weight_data_ptrs.emplace_back(p.second.data().data_ptr());
   }
-  if (unique_data_ptrs != data_ptrs_) {
+  if (weight_data_ptrs != data_ptrs_) {
     std::cerr << "Parameters are unflattened! Code path might be super slow. "
       "Please call flatten_parameters() when you muck around with storages!"
       << std::endl;
