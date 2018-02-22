@@ -69,6 +69,9 @@ ADD_LIBRARY(libgloo SHARED IMPORTED)
 SET_TARGET_PROPERTIES(libgloo PROPERTIES IMPORTED_NO_SONAME 1
   IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/pytorch/torch/lib/libgloo.so")
 
+ADD_LIBRARY(libgloo_cuda SHARED IMPORTED)
+SET_TARGET_PROPERTIES(libgloo_cuda PROPERTIES IMPORTED_NO_SONAME 1
+  IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/pytorch/torch/lib/libgloo_cuda.so")
 
 IF(APPLE)
   # Set RPATHs for OSX...
@@ -82,7 +85,7 @@ IF(APPLE)
 ENDIF(APPLE)
 
 ### Link stuff
-TARGET_LINK_LIBRARIES(autogradpp ATen libpythpp libgloo ${PYTHON_LIBRARIES})
+TARGET_LINK_LIBRARIES(autogradpp ATen libpythpp libgloo libgloo_cuda ${PYTHON_LIBRARIES})
 
 ### Optionally, link CUDA
 FIND_PACKAGE(CUDA)
