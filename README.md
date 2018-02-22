@@ -20,7 +20,8 @@ make -j
 
 # Stuff
 
-- Check out the [MNIST example](https://github.com/ebetica/autogradpp/blob/master/test.cpp#L283), which tries to replicate PyTorch's MNIST model + training loop
+- Check out the [MNIST example](https://github.com/ebetica/autogradpp/blob/eee977ddd377c484af5fce09ae8676410bb6fcce/tests/integration_t.cpp#L320-L355),
+which tries to replicate PyTorch's MNIST model + training loop
 - The principled way to write a model is probably something like 
 ```
 AUTOGRAD_CONTAINER_CLASS(MyModel) {
