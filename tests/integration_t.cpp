@@ -143,7 +143,7 @@ bool test_mnist(uint32_t batch_size, uint32_t num_epochs, bool useGPU,
      int label_count = rd.read_int();
 
      auto data = at::CPU(at::kLong).tensor({label_count});
-     auto a_data = data.accessor<long, 1>();
+     auto a_data = data.accessor<int64_t, 1>();
 
      for (int i = 0; i < label_count; ++i) {
        a_data[i] = long(rd.read_byte());
