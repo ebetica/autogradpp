@@ -26,7 +26,7 @@ class ContainerImpl;
 class OptimizerImpl;
 using Variable = tag::Variable;
 using variable_list = tag::variable_list;
-using Tensor = tag::Tensor;
+using Tensor = at::Tensor;
 using Container = std::shared_ptr<ContainerImpl>;
 using Optimizer = std::shared_ptr<OptimizerImpl>;
 
