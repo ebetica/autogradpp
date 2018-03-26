@@ -108,6 +108,50 @@ public:
   std::vector<Container> children_;
 };
 
+AUTOGRAD_CONTAINER_CLASS(Sequential) {
+  // Mimics nn.Sequential from pytorch.
+  // Basically a copy of ContainerList with a forward method implemented, and
+  // the option to supply a custom name when adding containers.
+ public:
+  ag::variable_list forward(ag::variable_list input) override {
+    for (auto& container : children_) {
+      input = container->forward(input);
+    }
+    return input;
+  };
+
+  ag::Container add(ag::Container m, std::string name = "") {
+    return append(m, name).children_.back();
+  }
+
+  Sequential& append(ag::Container m, std::string name = "") {
+    if (name == "") {
+      name = std::to_string(size());
+    }
+    this->children_.push_back(m);
+    ContainerImpl::add(this->children_.back(), name);
+    return *this;
+  }
+
+  ag::Container& operator[](int index) {
+    return children_[index];
+  }
+
+  int size() {
+    return children_.size();
+  }
+
+  auto begin() {
+    return children_.begin();
+  }
+
+  auto end() {
+    return children_.end();
+  }
+
+  std::vector<ag::Container> children_;
+};
+
 AUTOGRAD_CONTAINER_CLASS(SimpleContainer) {
   // Lets you use a container without making a new class,
   // for experimental implementations
