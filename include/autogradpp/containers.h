@@ -75,7 +75,7 @@ class Container_CRTP : public ContainerImpl {
 };
 
 template <class Derived>
-class ContainerList : public Container_CRTP<Derived> {
+class ContainerListImpl : public Container_CRTP<Derived> {
   // Lets you use a container like a vector without making a new class,
   // just for simple implementations
  public:
@@ -89,8 +89,8 @@ class ContainerList : public Container_CRTP<Derived> {
     return append(m).children_.back();
   }
 
-  ContainerList<Derived>& append(Container m) {
-    this->children_.push_back(m);
+  ContainerListImpl<Derived>& append(Container m) {
+    children_.push_back(m);
     ContainerImpl::add(children_.back(), std::to_string(size() - 1));
     return *this;
   }
@@ -114,7 +114,9 @@ class ContainerList : public Container_CRTP<Derived> {
   std::vector<Container> children_;
 };
 
-class Sequential : public ContainerList<Sequential> {
+class ContainerList : public ContainerListImpl<ContainerList> {};
+
+class Sequential : public ContainerListImpl<Sequential> {
   // Mimics nn.Sequential from pytorch.
  public:
   variable_list forward(variable_list input) override {
@@ -132,7 +134,7 @@ class Sequential : public ContainerList<Sequential> {
     if (name == "") {
       name = std::to_string(size());
     }
-    this->children_.push_back(m);
+    children_.push_back(m);
     ContainerImpl::add(children_.back(), name);
     return *this;
   }
