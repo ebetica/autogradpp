@@ -74,66 +74,28 @@ class Container_CRTP : public ContainerImpl {
   }
 };
 
-AUTOGRAD_CONTAINER_CLASS(ContainerList) {
+template <class Derived>
+class ContainerList : public Container_CRTP<Derived> {
   // Lets you use a container like a vector without making a new class,
   // just for simple implementations
-public:
+ public:
   virtual variable_list forward(variable_list) override {
-    throw std::runtime_error("ContainerList has no forward, maybe you"
+    throw std::runtime_error(
+        "ContainerList has no forward, maybe you"
         " wanted to subclass and override this function?");
   }
 
   Container add(Container m) {
-    this->children_.push_back(m);
-    ContainerImpl::add(this->children_.back(), std::to_string(size() - 1));
-    return this->children_.back();
+    return append(m).children_.back();
   }
 
-  ContainerList& append(Container m) {
+  ContainerList<Derived>& append(Container m) {
     this->children_.push_back(m);
-    ContainerImpl::add(this->children_.back(), std::to_string(size() - 1));
+    ContainerImpl::add(children_.back(), std::to_string(size() - 1));
     return *this;
   }
 
   Container& operator[](int index) {
-    return children_[index];
-  }
-
-  int size() { return children_.size(); }
-
-  auto begin() { return children_.begin(); }
-
-  auto end() { return children_.end(); }
-
-  std::vector<Container> children_;
-};
-
-AUTOGRAD_CONTAINER_CLASS(Sequential) {
-  // Mimics nn.Sequential from pytorch.
-  // Basically a copy of ContainerList with a forward method implemented, and
-  // the option to supply a custom name when adding containers.
- public:
-  ag::variable_list forward(ag::variable_list input) override {
-    for (auto& container : children_) {
-      input = container->forward(input);
-    }
-    return input;
-  };
-
-  ag::Container add(ag::Container m, std::string name = "") {
-    return append(m, name).children_.back();
-  }
-
-  Sequential& append(ag::Container m, std::string name = "") {
-    if (name == "") {
-      name = std::to_string(size());
-    }
-    this->children_.push_back(m);
-    ContainerImpl::add(this->children_.back(), name);
-    return *this;
-  }
-
-  ag::Container& operator[](int index) {
     return children_[index];
   }
 
@@ -149,7 +111,31 @@ AUTOGRAD_CONTAINER_CLASS(Sequential) {
     return children_.end();
   }
 
-  std::vector<ag::Container> children_;
+  std::vector<Container> children_;
+};
+
+class Sequential : public ContainerList<Sequential> {
+  // Mimics nn.Sequential from pytorch.
+ public:
+  variable_list forward(variable_list input) override {
+    for (auto& container : children_) {
+      input = container->forward(input);
+    }
+    return input;
+  }
+
+  Container add(Container m, std::string name = "") {
+    return append(m, name).children_.back();
+  }
+
+  Sequential& append(Container m, std::string name = "") {
+    if (name == "") {
+      name = std::to_string(size());
+    }
+    this->children_.push_back(m);
+    ContainerImpl::add(children_.back(), name);
+    return *this;
+  }
 };
 
 AUTOGRAD_CONTAINER_CLASS(SimpleContainer) {
