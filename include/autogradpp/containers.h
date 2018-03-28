@@ -74,24 +74,24 @@ class Container_CRTP : public ContainerImpl {
   }
 };
 
-AUTOGRAD_CONTAINER_CLASS(ContainerList) {
+template <class Derived>
+class ContainerListImpl : public Container_CRTP<Derived> {
   // Lets you use a container like a vector without making a new class,
   // just for simple implementations
-public:
+ public:
   virtual variable_list forward(variable_list) override {
-    throw std::runtime_error("ContainerList has no forward, maybe you"
+    throw std::runtime_error(
+        "ContainerList has no forward, maybe you"
         " wanted to subclass and override this function?");
   }
 
   Container add(Container m) {
-    this->children_.push_back(m);
-    ContainerImpl::add(this->children_.back(), std::to_string(size() - 1));
-    return this->children_.back();
+    return append(m).children_.back();
   }
 
-  ContainerList& append(Container m) {
-    this->children_.push_back(m);
-    ContainerImpl::add(this->children_.back(), std::to_string(size() - 1));
+  ContainerListImpl<Derived>& append(Container m) {
+    children_.push_back(m);
+    ContainerImpl::add(children_.back(), std::to_string(size() - 1));
     return *this;
   }
 
@@ -99,13 +99,45 @@ public:
     return children_[index];
   }
 
-  int size() { return children_.size(); }
+  int size() {
+    return children_.size();
+  }
 
-  auto begin() { return children_.begin(); }
+  auto begin() {
+    return children_.begin();
+  }
 
-  auto end() { return children_.end(); }
+  auto end() {
+    return children_.end();
+  }
 
   std::vector<Container> children_;
+};
+
+class ContainerList : public ContainerListImpl<ContainerList> {};
+
+class Sequential : public ContainerListImpl<Sequential> {
+  // Mimics nn.Sequential from pytorch.
+ public:
+  variable_list forward(variable_list input) override {
+    for (auto& container : children_) {
+      input = container->forward(input);
+    }
+    return input;
+  }
+
+  Container add(Container m, std::string name = "") {
+    return append(m, name).children_.back();
+  }
+
+  Sequential& append(Container m, std::string name = "") {
+    if (name == "") {
+      name = std::to_string(size());
+    }
+    children_.push_back(m);
+    ContainerImpl::add(children_.back(), name);
+    return *this;
+  }
 };
 
 AUTOGRAD_CONTAINER_CLASS(SimpleContainer) {
