@@ -40,6 +40,8 @@ TARGET_INCLUDE_DIRECTORIES(autogradpp
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/pytorch"
+    "${CMAKE_CURRENT_SOURCE_DIR}/pytorch/torch/lib/include/TH"
+    "${CMAKE_CURRENT_SOURCE_DIR}/pytorch/torch/lib/include/THC"
   PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include/autogradpp"
 )
@@ -111,6 +113,6 @@ IF(CUDA_FOUND)
     TARGET_LINK_LIBRARIES(autogradpp libgloo_cuda)
   ENDIF(APPLE)
   TARGET_LINK_LIBRARIES(autogradpp libpythpp_nvrtc
-    -L${CUDA_TOOLKIT_ROOT_DIR}/lib64 cuda nvrtc
+    -L${CUDA_TOOLKIT_ROOT_DIR}/lib64 cuda cudart nvrtc
    )
 ENDIF(CUDA_FOUND)

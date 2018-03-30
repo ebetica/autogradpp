@@ -72,6 +72,19 @@ class Container_CRTP : public ContainerImpl {
     ptr->reset_parameters();
     return ptr;
   }
+
+  std::shared_ptr<Derived> clone() const {
+    auto ptr = std::make_shared<Derived>(*static_cast<const Derived*>(this));
+    ptr->children_.clear();
+    ptr->params_.clear();
+    ptr->initialize_containers();
+    ptr->initialize_parameters();
+    auto newParams = ptr->parameters();
+    for (auto& param : parameters()) {
+      newParams[param.first].data().copy_(param.second.data());
+    }
+    return ptr;
+  }
 };
 
 template <class Derived>

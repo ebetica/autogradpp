@@ -6,6 +6,11 @@
 #include "torch/csrc/autograd/engine.h"
 #include "torch/csrc/autograd/grad_mode.h"
 
+// for AutoGPU. Usage: 
+//   AutoGPU gpu_raii(1);
+// While this object is in scope, all of your GPU tensors will go to GPU 1
+#include "torch/csrc/utils/auto_gpu.h"
+
 #define AUTOGRAD_OPTIMIZER_CLASS(Type) class Type : public autograd::Optimizer_CRTP<Type>
 #define AUTOGRAD_KWARG(CLS, TYP, NAME, DEFAULT, OPTION) \
   TYP NAME ## _ = DEFAULT; \
@@ -55,6 +60,7 @@ class no_grad_guard {
 
 void setSeed(uint64_t seed);
 
+int getNumGPUs();
 bool hasCuda();
 bool hasCudnn();
 
