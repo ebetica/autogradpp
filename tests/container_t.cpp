@@ -128,7 +128,7 @@ AUTOGRAD_CONTAINER_CLASS(TestModel) {
   variable_list forward(variable_list input) override { return input; };
 };
 
-CASE("containers/linear/simple") {
+CASE("containers/clone") {
   auto model = TestModel().make();
 
   auto model2 = model->clone();
