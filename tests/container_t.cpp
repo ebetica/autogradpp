@@ -64,7 +64,6 @@ CASE("containers/conv3d/even") {
   EXPECT(model->parameters()["weight"].grad().numel() == 3 * 2 * 3 * 3 * 3);
 };
 
-
 CASE("containers/linear/basic1") {
   auto model = Linear(5, 2).make();
   auto x = Var(at::CPU(at::kFloat).randn({10, 5}), true);
@@ -116,6 +115,32 @@ CASE("containers/linear/simple") {
   EXPECT(x.size(0) == 1000);
   EXPECT(x.size(1) == 100);
   EXPECT(x.data().min().toCFloat() == 0);
+};
+
+AUTOGRAD_CONTAINER_CLASS(TestModel) {
+ public:
+  void initialize_containers() override {
+    add(Linear(10, 3).make(), "l1");
+    add(Linear(3, 5).make(), "l2");
+    add(Linear(5, 100).make(), "l3");
+  }
+
+  variable_list forward(variable_list input) override { return input; };
+};
+
+CASE("containers/linear/simple") {
+  auto model = TestModel().make();
+
+  auto model2 = model->clone();
+  auto m1param = model->parameters();
+  auto m2param = model2->parameters();
+  for (auto& param : m1param) {
+    EXPECT(param.second.allclose(m2param[param.first]));
+    param.second.data().mul_(2);
+  }
+  for (auto& param : m1param) {
+    EXPECT(!param.second.allclose(m2param[param.first]));
+  }
 };
 
 CASE("containers/embedding/basic") {
