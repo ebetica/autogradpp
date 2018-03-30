@@ -1,5 +1,4 @@
 #include <ATen/Config.h>
-#include <THC/THCTensorRandom.h>
 
 #include <algorithm>
 #include <cmath>
@@ -9,6 +8,7 @@
 #if AT_CUDA_ENABLED()
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <THC/THCTensorRandom.h>
 #endif
 
 #include "detail.h"
