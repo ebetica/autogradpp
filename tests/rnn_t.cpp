@@ -148,17 +148,21 @@ CASE("integration/RNN/RNN/Tanh") {
 };
 
 CASE("integration/RNN/cuda/LSTM") {
+  CUDA_GUARD;
   EXPECT(test_RNN_xor<LSTM>([](int s) { return LSTM(s, s).nlayers(2).make(); }, true));
 };
 
 CASE("integration/RNN/cuda/GRU") {
+  CUDA_GUARD;
   EXPECT(test_RNN_xor<GRU>([](int s) { return GRU(s, s).nlayers(2).make(); }, true));
 };
 
 CASE("integration/RNN/cuda/RNN/Relu") {
+  CUDA_GUARD;
   EXPECT(test_RNN_xor<RNN>([](int s) { return RNN(s, s, RNN::Mode::Relu).nlayers(2).make(); }, true));
 };
 
 CASE("integration/RNN/cuda/RNN/Tanh") {
+  CUDA_GUARD;
   EXPECT(test_RNN_xor<RNN>([](int s) { return RNN(s, s, RNN::Mode::Tanh).nlayers(2).make(); }, true));
 };

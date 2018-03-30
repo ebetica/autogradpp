@@ -1,9 +1,15 @@
 #include <ATen/Config.h>
+#include <THC/THCTensorRandom.h>
 
 #include <algorithm>
 #include <cmath>
 #include <functional>
 #include <stdexcept>
+
+#if AT_CUDA_ENABLED()
+#include <cuda.h>
+#include <cuda_runtime.h>
+#endif
 
 #include "detail.h"
 
@@ -27,25 +33,39 @@ void backward(Tensor loss, bool keep_graph) {
 }
 
 void setSeed(uint64_t seed) {
-  for (auto i = 0; i < static_cast<int>(at::Backend::NumOptions); i++) {
-    try {
-      at::globalContext()
-          .defaultGenerator(static_cast<at::Backend>(i))
-          .manualSeed(seed);
-    } catch (const std::runtime_error &e) {
-      // defaultGenerator() will throw a runtime error for backends that are not
-      // available (e.g. CUDA on non-GPU machines).
-      // We ignore those at the moment.
-      continue;
-    }
+  at::globalContext().defaultGenerator(at::Backend::CPU).manualSeed(seed);
+#if AT_CUDA_ENABLED()
+  if (getNumGPUs() > 0) {
+    THCRandom_manualSeedAll(at::globalContext().lazyInitCUDA(), seed);
   }
+#endif
 };
 
-bool hasCuda() {
-  return AT_CUDA_ENABLED();
+int getNumGPUs() {
+#if AT_CUDA_ENABLED()
+  int count;
+  auto err = cudaGetDeviceCount(&count);
+  if (err == cudaErrorNoDevice) {
+    return 0;
+  } else if (err != cudaSuccess) {
+    std::string msg = "CUDA error (";
+    msg += std::to_string(err);
+    msg += "): ";
+    msg += cudaGetErrorString(err);
+    throw std::runtime_error(msg);
+  }
+  return count;
+#else
+  return 0;
+#endif
 }
+
+bool hasCuda() {
+  return getNumGPUs() > 0;
+}
+
 bool hasCudnn() {
-  return AT_CUDNN_ENABLED();
+  return hasCuda() && AT_CUDNN_ENABLED();
 }
 
 } // namespace autograd
