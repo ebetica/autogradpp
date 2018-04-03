@@ -9,7 +9,7 @@
 namespace autograd {
 class ContainerImpl {
  public:
-  // Only construct parameters in initialize_parameters, and 
+  // Only construct parameters in initialize_parameters, and
   // containers in initialize_containers. Most of the time, the containers are
   // the only thing you need to add.
   // You are guaranteed that containers are added before parameters.
@@ -18,6 +18,7 @@ class ContainerImpl {
   virtual void reset_parameters() { };
 
   virtual variable_list forward(variable_list) = 0;
+  virtual Container clone() const = 0;
 
   std::map<std::string, Variable> parameters() const;
   Variable& param(std::string const&);
@@ -73,7 +74,7 @@ class Container_CRTP : public ContainerImpl {
     return ptr;
   }
 
-  std::shared_ptr<Derived> clone() const {
+  Container clone() const override {
     auto ptr = std::make_shared<Derived>(*static_cast<const Derived*>(this));
     ptr->children_.clear();
     ptr->params_.clear();
@@ -320,7 +321,7 @@ template <typename Derived>
 class RNNBase : public Container_CRTP<Derived> {
  public:
   // These must line up with the CUDNN mode codes
-  enum RNNMode : int64_t { 
+  enum RNNMode : int64_t {
     RNN_RELU = 0,
     RNN_TANH = 1,
     LSTM = 2,
@@ -350,7 +351,7 @@ class RNNBase : public Container_CRTP<Derived> {
   uint32_t input_size_;
   uint32_t hidden_size_;
   uint32_t gate_size_;
-  // This is copied from pytorch, to determine whether weights are flat for 
+  // This is copied from pytorch, to determine whether weights are flat for
   // the fast CUDNN route. Otherwise, we have to use non flattened weights, which
   // are much slower.
   // https://github.com/pytorch/pytorch/blob/1848cad10802db9fa0aa066d9de195958120d863/torch/nn/modules/rnn.py#L159-L165
@@ -394,7 +395,7 @@ template class RNNBase<RNN>;
 class RNN : public RNNBase<RNN> {
  public:
   enum Mode { Tanh, Relu };
-  RNN(uint32_t inp_size, uint32_t hid_size, Mode mode = Mode::Tanh) 
+  RNN(uint32_t inp_size, uint32_t hid_size, Mode mode = Mode::Tanh)
     : RNNBase(inp_size, hid_size) {
     if (mode == Mode::Tanh) {
       mode_ = RNNBase::RNNMode::RNN_TANH;
