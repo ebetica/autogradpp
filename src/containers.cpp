@@ -180,15 +180,15 @@ variable_list Conv::forward(variable_list input) {
   Variable out;
   if (Nd_ == 1 || Nd_ == 2) {
     if (transposed_) {
-      out = at::conv_transpose2d(x, weight, bias, stride_, padding_, output_padding_, 1, dilation_);
+      out = at::conv_transpose2d(x, weight, bias, stride_, padding_, output_padding_, groups_, dilation_);
     } else {
-      out = at::conv2d(x, weight, bias, stride_, padding_, dilation_);
+      out = at::conv2d(x, weight, bias, stride_, padding_, dilation_, groups_);
     }
   } else if (Nd_ == 3) {
     if (transposed_) {
-      out = at::conv_transpose3d(x, weight, bias, stride_, padding_, output_padding_, 1, dilation_);
+      out = at::conv_transpose3d(x, weight, bias, stride_, padding_, output_padding_, groups_, dilation_);
     } else {
-      out = at::conv3d(x, weight, bias, stride_, padding_, dilation_);
+      out = at::conv3d(x, weight, bias, stride_, padding_, dilation_, groups_);
     }
   }
 
