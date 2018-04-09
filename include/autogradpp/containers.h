@@ -166,6 +166,19 @@ AUTOGRAD_CONTAINER_CLASS(SimpleContainer) {
 
 };
 
+AUTOGRAD_CONTAINER_CLASS(Functional) {
+  // Lets you create a container from a function, designed for use in
+  // Sequential.
+public:
+  Functional(std::function<variable_list(variable_list)> fun) : fun_(fun){};
+  Functional(std::function<Variable(Variable)> fun)
+      : fun_([&](variable_list input) { return variable_list({fun(input[0])}); }){};
+
+  variable_list forward(variable_list input) override { return fun_(input); };
+
+  std::function<variable_list(variable_list)> fun_;
+};
+
 AUTOGRAD_CONTAINER_CLASS(Linear) {
  public:
    Linear(uint32_t nin, uint32_t nout)

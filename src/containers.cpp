@@ -7,7 +7,7 @@ std::map<std::string, Variable> ContainerImpl::parameters() const {
     auto& name = pair.first;
     auto& child = pair.second;
     for (auto& p : child->parameters()) {
-      ret[name + "/" + p.first] = p.second;
+      ret[name + "." + p.first] = p.second;
     }
   }
   for (auto pair : params_) {
@@ -16,8 +16,27 @@ std::map<std::string, Variable> ContainerImpl::parameters() const {
   return ret;
 }
 
-Variable& ContainerImpl::param(std::string const& name) {
-  auto it = params_.find(name);
+Variable &ContainerImpl::param(std::string const &name) {
+  ContainerImpl& container = *this;
+  auto begin = 0;
+  while (true) {
+    auto dot_pos = name.find('.', begin);
+    if (dot_pos == name.size()) {
+      break;
+    }
+
+    auto child_name = name.substr(begin, dot_pos - begin);
+    auto it = container.children_.find(child_name);
+    if (it == container.children_.end()) {
+      throw std::runtime_error("No such child: " + child_name);
+    }
+
+    container = *(it->second);
+    begin = dot_pos + 1; // Skip the dot
+  }
+
+  auto param_name = name.substr(begin);
+  auto it = container.params_.find(param_name);
   if (it == params_.end()) {
     throw std::runtime_error("No such param: " + name);
   }
@@ -68,6 +87,11 @@ Container ContainerImpl::add(Container m, std::string const& name) {
   if (this->children_.find(name) != this->children_.end()) {
     throw std::runtime_error("Trying to add container that already exists");
   }
+  if (std::find(name.begin(), name.end(), '.') != name.end()) {
+    // We can't allow containers with dots in their names, as that would make
+    // their parameters not findable with parameters().
+    throw std::runtime_error("Trying to add parameter with a '.' in its name");
+  }
   this->children_[name] = std::move(m);
   return this->children_[name];
 }
@@ -75,6 +99,11 @@ Container ContainerImpl::add(Container m, std::string const& name) {
 Variable& ContainerImpl::add(Variable v, std::string const& name) {
   if (this->params_.find(name) != this->params_.end()) {
     throw std::runtime_error("Trying to add parameter that already exists");
+  }
+  if (std::find(name.begin(), name.end(), '.') != name.end()) {
+    // We can't allow parameters with dots in their names, as that would make
+    // them not findable with parameters().
+    throw std::runtime_error("Trying to add parameter with a '.' in its name");
   }
   this->params_[name] = v;
   return this->params_[name];
@@ -330,7 +359,7 @@ variable_list RNNBase<Derived>::LSTM_cell_forward(variable_list inputs, int i) {
   auto cy = (forget_gate * cx) + (in_gate * cell_gate);
   auto hy = out_gate * cy.tanh();
 
-  return variable_list({at::stack({hy, cy}, 0)}); 
+  return variable_list({at::stack({hy, cy}, 0)});
 }
 
 template <typename Derived>
@@ -348,8 +377,8 @@ variable_list RNNBase<Derived>::autograd_forward(variable_list inputs) {
 
   std::vector<Tensor> hidden;
   for (size_t i = 0; i < nlayers_; i++) {
-    hidden.push_back(inputs[1].defined() 
-        ? inputs[1][i] 
+    hidden.push_back(inputs[1].defined()
+        ? inputs[1][i]
         : tag::Variable());
   }
 
