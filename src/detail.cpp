@@ -6,9 +6,9 @@
 #include <stdexcept>
 
 #if AT_CUDA_ENABLED()
+#include <THC/THCTensorRandom.h>
 #include <cuda.h>
 #include <cuda_runtime.h>
-#include <THC/THCTensorRandom.h>
 #endif
 
 #include "detail.h"

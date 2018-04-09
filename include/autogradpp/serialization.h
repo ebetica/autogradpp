@@ -5,15 +5,15 @@
 #include "cereal/archives/binary.hpp"
 #include "cereal/types/polymorphic.hpp"
 
-#include "cereal/types/vector.hpp"
-#include "cereal/types/unordered_map.hpp"
 #include "cereal/types/string.hpp"
+#include "cereal/types/unordered_map.hpp"
+#include "cereal/types/vector.hpp"
 
 namespace autograd {
 
 // Some convenience functions for saving and loading
 template <typename T>
-void save(std::ostream& stream, T const & obj) {
+void save(std::ostream& stream, T const& obj) {
   cereal::BinaryOutputArchive archive(stream);
   archive(*obj);
 }
@@ -23,7 +23,7 @@ void load(std::istream& stream, T& obj) {
   archive(*obj);
 }
 template <typename T>
-void save(std::ostream& stream, T const * obj) {
+void save(std::ostream& stream, T const* obj) {
   cereal::BinaryOutputArchive archive(stream);
   archive(*obj);
 }
@@ -33,7 +33,7 @@ void load(std::istream& stream, T* obj) {
   archive(*obj);
 }
 template <typename T>
-void save(std::string const& path, T const & obj) {
+void save(std::string const& path, T const& obj) {
   std::ofstream os(path, std::ios::binary);
   autograd::save(os, obj);
 }
@@ -43,15 +43,19 @@ void load(std::string const& path, T& obj) {
   autograd::load(is, obj);
 }
 
-}  // namespace autograd
+} // namespace autograd
 
 // This is super ugly and I don't know how to simplify it
 CEREAL_REGISTER_TYPE(autograd::SGD);
 CEREAL_REGISTER_POLYMORPHIC_RELATION(autograd::OptimizerImpl, autograd::SGD);
 CEREAL_REGISTER_TYPE(autograd::Adagrad);
-CEREAL_REGISTER_POLYMORPHIC_RELATION(autograd::OptimizerImpl, autograd::Adagrad);
+CEREAL_REGISTER_POLYMORPHIC_RELATION(
+    autograd::OptimizerImpl,
+    autograd::Adagrad);
 CEREAL_REGISTER_TYPE(autograd::RMSprop);
-CEREAL_REGISTER_POLYMORPHIC_RELATION(autograd::OptimizerImpl, autograd::RMSprop);
+CEREAL_REGISTER_POLYMORPHIC_RELATION(
+    autograd::OptimizerImpl,
+    autograd::RMSprop);
 CEREAL_REGISTER_TYPE(autograd::Adam);
 CEREAL_REGISTER_POLYMORPHIC_RELATION(autograd::OptimizerImpl, autograd::Adam);
 
@@ -60,28 +64,30 @@ namespace cereal {
 namespace agimpl {
 
 template <class Archive>
-void saveBinary(Archive & archive, void const * data, std::size_t size) {
+void saveBinary(Archive& archive, void const* data, std::size_t size) {
   // In general, there's no direct `saveBinary`-like method on archives
-  std::vector<char> v(reinterpret_cast<char const*>(data),
+  std::vector<char> v(
+      reinterpret_cast<char const*>(data),
       reinterpret_cast<char const*>(data) + size);
   archive(v);
 }
 template <>
-inline void saveBinary(BinaryOutputArchive & archive, void const * data,
-    std::size_t size) {
+inline void
+saveBinary(BinaryOutputArchive& archive, void const* data, std::size_t size) {
   // Writes to output stream without extra copy
   archive.saveBinary(data, size);
 }
 
 template <class Archive>
-void loadBinary(Archive & archive, void * data, std::size_t size) {
+void loadBinary(Archive& archive, void* data, std::size_t size) {
   // In general, there's no direct `loadBinary`-like method on archives
   std::vector<char> v(size);
   archive(v);
   std::memcpy(data, v.data(), size);
 }
 template <>
-inline void loadBinary(BinaryInputArchive & archive, void * data, std::size_t size) {
+inline void
+loadBinary(BinaryInputArchive& archive, void* data, std::size_t size) {
   // Read from input stream without extra copy
   archive.loadBinary(data, size);
 }
@@ -90,7 +96,7 @@ inline void loadBinary(BinaryInputArchive & archive, void * data, std::size_t si
 
 // Gradients will not be saved for variables
 template <class Archive>
-void save(Archive & archive, at::Tensor const & tensor) {
+void save(Archive& archive, at::Tensor const& tensor) {
   if (!tensor.defined()) {
     auto type = at::ScalarType::Undefined;
     archive(CEREAL_NVP(type));
@@ -119,7 +125,7 @@ void save(Archive & archive, at::Tensor const & tensor) {
  * 2. Otherwise, overwrite the provided tensor with the right type and backend
  **/
 template <class Archive>
-void load(Archive & archive, at::Tensor & tensor) {
+void load(Archive& archive, at::Tensor& tensor) {
   at::ScalarType type;
   archive(CEREAL_NVP(type));
   if (type == at::ScalarType::Undefined) {
@@ -149,8 +155,8 @@ void load(Archive & archive, at::Tensor & tensor) {
 }
 
 template <class Archive>
-void load(Archive & archive, tag::Variable & var) {
+void load(Archive& archive, tag::Variable& var) {
   load(archive, var.data());
 }
 
-}  // namespace cereal
+} // namespace cereal

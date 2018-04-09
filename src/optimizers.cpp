@@ -21,7 +21,8 @@ void SGD::step() {
     auto& name = pair.first;
     auto& grad = pair.second.grad();
     auto& p = pair.second.data();
-    if (!grad.defined()) continue;
+    if (!grad.defined())
+      continue;
 
     auto d_p = grad.data();
     if (weight_decay_ > 0) {
@@ -45,7 +46,7 @@ void SGD::step() {
       }
     }
 
-    p.add_(d_p, - lr_);
+    p.add_(d_p, -lr_);
   }
 }
 
@@ -60,13 +61,14 @@ void Adagrad::step() {
     auto& name = pair.first;
     auto& grad = pair.second.grad();
     auto& p = pair.second.data();
-    if (!grad.defined()) continue;
+    if (!grad.defined())
+      continue;
 
     auto d_p = grad.data();
     if (weight_decay_ > 0) {
       d_p.add_(p, weight_decay_);
     };
-    auto &step = step_[name];
+    auto& step = step_[name];
     step += 1.0;
     auto clr = lr_ / (1.0 + (step - 1.0) * lr_decay_);
     at::Tensor buf;
@@ -145,7 +147,8 @@ void Adam::step() {
     auto& name = pair.first;
     auto& grad = pair.second.grad();
     auto& p = pair.second.data();
-    if (!grad.defined()) continue;
+    if (!grad.defined())
+      continue;
 
     if (step_buffer_.find(name) == step_buffer_.end()) {
       step_buffer_[name] = 0;
@@ -167,23 +170,23 @@ void Adam::step() {
       d_p.add_(p, weight_decay_);
     }
 
-     exp_avg.mul_(beta1_).add_(d_p, 1 - beta1_);
-     exp_avg_sq.mul_(beta2_).addcmul_(d_p, d_p, 1 - beta2_);
+    exp_avg.mul_(beta1_).add_(d_p, 1 - beta1_);
+    exp_avg_sq.mul_(beta2_).addcmul_(d_p, d_p, 1 - beta2_);
 
-     at::Tensor denom;
-     if (amsgrad_) {
-       auto& max_exp_avg_sq = max_exp_avg_sq_buffer_[name];
-       at::max_out(max_exp_avg_sq, max_exp_avg_sq, exp_avg_sq);
-       denom = max_exp_avg_sq.sqrt().add_(eps_);
-     } else {
-       denom = exp_avg_sq.sqrt().add_(eps_);
-     };
+    at::Tensor denom;
+    if (amsgrad_) {
+      auto& max_exp_avg_sq = max_exp_avg_sq_buffer_[name];
+      at::max_out(max_exp_avg_sq, max_exp_avg_sq, exp_avg_sq);
+      denom = max_exp_avg_sq.sqrt().add_(eps_);
+    } else {
+      denom = exp_avg_sq.sqrt().add_(eps_);
+    };
 
-     auto bias_correction1 = 1 - std::pow(beta1_, step);
-     auto bias_correction2 = 1 - std::pow(beta2_, step);
-     auto step_size = lr_ * std::sqrt(bias_correction2) / bias_correction1;
+    auto bias_correction1 = 1 - std::pow(beta1_, step);
+    auto bias_correction2 = 1 - std::pow(beta2_, step);
+    auto step_size = lr_ * std::sqrt(bias_correction2) / bias_correction1;
 
-     p.addcdiv_(exp_avg, denom, -step_size);
+    p.addcdiv_(exp_avg, denom, -step_size);
   }
 }
 

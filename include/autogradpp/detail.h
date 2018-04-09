@@ -6,21 +6,24 @@
 #include "torch/csrc/autograd/engine.h"
 #include "torch/csrc/autograd/grad_mode.h"
 
-// for AutoGPU. Usage: 
+// for AutoGPU. Usage:
 //   AutoGPU gpu_raii(1);
 // While this object is in scope, all of your GPU tensors will go to GPU 1
 #include "torch/csrc/utils/auto_gpu.h"
 
-#define AUTOGRAD_OPTIMIZER_CLASS(Type) class Type : public autograd::Optimizer_CRTP<Type>
+#define AUTOGRAD_OPTIMIZER_CLASS(Type) \
+  class Type : public autograd::Optimizer_CRTP<Type>
 #define AUTOGRAD_KWARG(CLS, TYP, NAME, DEFAULT, OPTION) \
-  TYP NAME ## _ = DEFAULT; \
-  CLS & NAME(TYP x = OPTION) { NAME ## _ = x; return *this; }
-
+  TYP NAME##_ = DEFAULT;                                \
+  CLS& NAME(TYP x = OPTION) {                           \
+    NAME##_ = x;                                        \
+    return *this;                                       \
+  }
 
 namespace {
 namespace tag = torch::autograd;
 using IntVec = decltype(std::declval<at::IntList>().vec());
-}
+} // namespace
 
 namespace autograd {
 namespace detail {
@@ -35,14 +38,14 @@ using Tensor = at::Tensor;
 using Container = std::shared_ptr<ContainerImpl>;
 using Optimizer = std::shared_ptr<OptimizerImpl>;
 
-void backward(Tensor loss, bool keep_graph=false);
+void backward(Tensor loss, bool keep_graph = false);
 
-inline Variable Var(at::Tensor data, bool requires_grad=true) {
+inline Variable Var(at::Tensor data, bool requires_grad = true) {
   return tag::make_variable(data, requires_grad);
 }
 
 // This is thread local!!!
-inline void set_grad_enabled(bool val=true) {
+inline void set_grad_enabled(bool val = true) {
   tag::GradMode::set_enabled(val);
 }
 

@@ -4,7 +4,8 @@
 
 #include "torch/csrc/autograd/variable.h"
 
-#define AUTOGRAD_CONTAINER_CLASS(Type) class Type : public autograd::Container_CRTP<Type>
+#define AUTOGRAD_CONTAINER_CLASS(Type) \
+  class Type : public autograd::Container_CRTP<Type>
 
 namespace autograd {
 class ContainerImpl {
@@ -13,9 +14,9 @@ class ContainerImpl {
   // containers in initialize_containers. Most of the time, the containers are
   // the only thing you need to add.
   // You are guaranteed that containers are added before parameters.
-  virtual void initialize_containers() { };
-  virtual void initialize_parameters() { };
-  virtual void reset_parameters() { };
+  virtual void initialize_containers(){};
+  virtual void initialize_parameters(){};
+  virtual void reset_parameters(){};
 
   virtual variable_list forward(variable_list) = 0;
   virtual Container clone() const = 0;
@@ -35,8 +36,8 @@ class ContainerImpl {
   bool cuda_ = false;
   bool train_ = true;
 
-  template<class Archive>
-  void save(Archive & ar) const {
+  template <class Archive>
+  void save(Archive& ar) const {
     auto params = parameters();
     std::size_t size = params.size();
     ar(size);
@@ -45,8 +46,8 @@ class ContainerImpl {
     }
   }
 
-  template<class Archive>
-  void load(Archive & ar) {
+  template <class Archive>
+  void load(Archive& ar) {
     auto params = parameters();
     std::size_t size;
     ar(size);
@@ -159,35 +160,38 @@ AUTOGRAD_CONTAINER_CLASS(SimpleContainer) {
   // for experimental implementations
  public:
   virtual variable_list forward(variable_list) override {
-    throw std::runtime_error("SimpleContainer has no forward, maybe you"
+    throw std::runtime_error(
+        "SimpleContainer has no forward, maybe you"
         " wanted to subclass and override this function?");
   }
   using ContainerImpl::add;
-
 };
 
 AUTOGRAD_CONTAINER_CLASS(Functional) {
   // Lets you create a container from a function, designed for use in
   // Sequential.
-public:
+ public:
   Functional(std::function<variable_list(variable_list)> fun) : fun_(fun){};
   Functional(std::function<Variable(Variable)> fun)
-      : fun_([&](variable_list input) { return variable_list({fun(input[0])}); }){};
+      : fun_([&](variable_list input) {
+          return variable_list({fun(input[0])});
+        }){};
 
-  variable_list forward(variable_list input) override { return fun_(input); };
+  variable_list forward(variable_list input) override {
+    return fun_(input);
+  };
 
   std::function<variable_list(variable_list)> fun_;
 };
 
 AUTOGRAD_CONTAINER_CLASS(Linear) {
  public:
-   Linear(uint32_t nin, uint32_t nout)
-     : nin(nin), nout(nout) { }
+  Linear(uint32_t nin, uint32_t nout) : nin(nin), nout(nout) {}
 
-   variable_list forward(variable_list) override;
-   void reset_parameters() override;
-   void initialize_parameters() override;
-   AUTOGRAD_KWARG(Linear, bool, no_bias, false, true);
+  variable_list forward(variable_list) override;
+  void reset_parameters() override;
+  void initialize_parameters() override;
+  AUTOGRAD_KWARG(Linear, bool, no_bias, false, true);
 
   Variable weight, bias;
   uint32_t nin, nout;
@@ -195,12 +199,12 @@ AUTOGRAD_CONTAINER_CLASS(Linear) {
 
 AUTOGRAD_CONTAINER_CLASS(Embedding) {
  public:
-   Embedding(uint32_t num_embeddings, uint32_t embedding_dim)
-     : num_embeddings(num_embeddings), embedding_dim(embedding_dim) { }
+  Embedding(uint32_t num_embeddings, uint32_t embedding_dim)
+      : num_embeddings(num_embeddings), embedding_dim(embedding_dim) {}
 
-   variable_list forward(variable_list) override;
-   void reset_parameters() override;
-   void initialize_parameters() override;
+  variable_list forward(variable_list) override;
+  void reset_parameters() override;
+  void initialize_parameters() override;
 
   Variable weight;
   uint32_t num_embeddings, embedding_dim;
@@ -209,92 +213,104 @@ AUTOGRAD_CONTAINER_CLASS(Embedding) {
 AUTOGRAD_CONTAINER_CLASS(Conv) {
  private:
   Conv(uint32_t Nd, uint32_t in_chan, uint32_t out_chan)
-    : Nd_(Nd),
-      in_channels_(in_chan),
-      out_channels_(out_chan),
-      stride_(makeTup(1, 1)),
-      padding_(makeTup(0)),
-      dilation_(makeTup(1, 1)),
-      dilated_(false),
-      output_padding_(makeTup(0))
-      { }
+      : Nd_(Nd),
+        in_channels_(in_chan),
+        out_channels_(out_chan),
+        stride_(makeTup(1, 1)),
+        padding_(makeTup(0)),
+        dilation_(makeTup(1, 1)),
+        dilated_(false),
+        output_padding_(makeTup(0)) {}
 
  public:
   Conv(uint32_t Nd, uint32_t in_chan, uint32_t out_chan, int ks)
-    : Conv(Nd, in_chan, out_chan) {
-      ks_ = makeTup(ks, 1);
-    }
+      : Conv(Nd, in_chan, out_chan) {
+    ks_ = makeTup(ks, 1);
+  }
 
   Conv(uint32_t Nd, uint32_t in_chan, uint32_t out_chan, IntVec ks)
-    : Conv(Nd, in_chan, out_chan) {
-      ks_ = makeTup(ks);
-    }
+      : Conv(Nd, in_chan, out_chan) {
+    ks_ = makeTup(ks);
+  }
 
   void reset_parameters() override;
   variable_list forward(variable_list) override;
   void initialize_parameters() override;
 
   template <typename T>
-  Conv& stride(T s) { stride_ = makeTup(s, 1); return *this; }
+  Conv& stride(T s) {
+    stride_ = makeTup(s, 1);
+    return *this;
+  }
   template <typename T>
-  Conv& padding(T s) { padding_ = makeTup(s); return *this; }
+  Conv& padding(T s) {
+    padding_ = makeTup(s);
+    return *this;
+  }
   template <typename T>
-  Conv& dilation(T s) { dilation_ = makeTup(s, 1); return *this; }
+  Conv& dilation(T s) {
+    dilation_ = makeTup(s, 1);
+    return *this;
+  }
   template <typename T>
-  Conv& output_padding(T s) { output_padding_ = makeTup(s); return *this; }
+  Conv& output_padding(T s) {
+    output_padding_ = makeTup(s);
+    return *this;
+  }
 
   AUTOGRAD_KWARG(Conv, bool, transposed, false, true)
   AUTOGRAD_KWARG(Conv, bool, no_bias, false, true)
   AUTOGRAD_KWARG(Conv, int, groups, 1, 1)
 
-   Variable weight, bias;
-   uint32_t Nd_;
-   uint32_t in_channels_;
-   uint32_t out_channels_;
-   IntVec ks_;
-   IntVec stride_;
-   IntVec padding_;
-   IntVec dilation_;
-   bool dilated_;
-   IntVec output_padding_;
-  protected:
-   IntVec makeTup(int x, int def=0) {
-     IntVec ret;
-     if (Nd_ == 1) {
-       ret.push_back(x);
-       ret.push_back(def);
-     } else {
-       for (auto i = 0U; i < Nd_; i++) ret.push_back(x);
-     }
-     return ret;
-   }
-   IntVec makeTup(IntVec x) {
-     return x;
-   }
+  Variable weight, bias;
+  uint32_t Nd_;
+  uint32_t in_channels_;
+  uint32_t out_channels_;
+  IntVec ks_;
+  IntVec stride_;
+  IntVec padding_;
+  IntVec dilation_;
+  bool dilated_;
+  IntVec output_padding_;
+
+ protected:
+  IntVec makeTup(int x, int def = 0) {
+    IntVec ret;
+    if (Nd_ == 1) {
+      ret.push_back(x);
+      ret.push_back(def);
+    } else {
+      for (auto i = 0U; i < Nd_; i++)
+        ret.push_back(x);
+    }
+    return ret;
+  }
+  IntVec makeTup(IntVec x) {
+    return x;
+  }
 };
 
 class Conv1d : public Conv {
  public:
-  Conv1d(uint32_t i, uint32_t o, int ks) : Conv(1, i, o, ks) { }
-  Conv1d(uint32_t i, uint32_t o, IntVec ks) : Conv(1, i, o, ks) { }
+  Conv1d(uint32_t i, uint32_t o, int ks) : Conv(1, i, o, ks) {}
+  Conv1d(uint32_t i, uint32_t o, IntVec ks) : Conv(1, i, o, ks) {}
 };
 
 class Conv2d : public Conv {
  public:
-  Conv2d(uint32_t i, uint32_t o, int ks) : Conv(2, i, o, ks) { }
-  Conv2d(uint32_t i, uint32_t o, IntVec ks) : Conv(2, i, o, ks) { }
+  Conv2d(uint32_t i, uint32_t o, int ks) : Conv(2, i, o, ks) {}
+  Conv2d(uint32_t i, uint32_t o, IntVec ks) : Conv(2, i, o, ks) {}
 };
 
 class Conv3d : public Conv {
  public:
-  Conv3d(uint32_t i, uint32_t o, int ks) : Conv(3, i, o, ks) { }
-  Conv3d(uint32_t i, uint32_t o, IntVec ks) : Conv(3, i, o, ks) { }
+  Conv3d(uint32_t i, uint32_t o, int ks) : Conv(3, i, o, ks) {}
+  Conv3d(uint32_t i, uint32_t o, IntVec ks) : Conv(3, i, o, ks) {}
 };
 
 AUTOGRAD_CONTAINER_CLASS(BatchNorm) {
  public:
-  BatchNorm(uint32_t num_features)
-    : num_features_(num_features) {}
+  BatchNorm(uint32_t num_features) : num_features_(num_features) {}
 
   AUTOGRAD_KWARG(BatchNorm, double, eps, 1e-5, 1e-5)
   AUTOGRAD_KWARG(BatchNorm, double, momentum, 0.1, 0.1)
@@ -316,16 +332,22 @@ AUTOGRAD_CONTAINER_CLASS(BatchNorm) {
 
 AUTOGRAD_CONTAINER_CLASS(Dropout) {
  public:
-  Dropout(double p=0.5) : p_(p) { assert(p < 1 && p >= 0); }
+  Dropout(double p = 0.5) : p_(p) {
+    assert(p < 1 && p >= 0);
+  }
   variable_list forward(variable_list) override;
+
  protected:
   double p_;
 };
 
 AUTOGRAD_CONTAINER_CLASS(Dropout2d) {
  public:
-  Dropout2d(double p=0.5) : p_(p) { assert(p < 1 && p >= 0); }
+  Dropout2d(double p = 0.5) : p_(p) {
+    assert(p < 1 && p >= 0);
+  }
   variable_list forward(variable_list) override;
+
  protected:
   double p_;
 };
@@ -334,21 +356,16 @@ template <typename Derived>
 class RNNBase : public Container_CRTP<Derived> {
  public:
   // These must line up with the CUDNN mode codes
-  enum RNNMode : int64_t {
-    RNN_RELU = 0,
-    RNN_TANH = 1,
-    LSTM = 2,
-    GRU = 3
-  };
+  enum RNNMode : int64_t { RNN_RELU = 0, RNN_TANH = 1, LSTM = 2, GRU = 3 };
   RNNBase(uint32_t input_size, uint32_t hidden_size)
-    : input_size_(input_size), hidden_size_(hidden_size) { }
+      : input_size_(input_size), hidden_size_(hidden_size) {}
 
   AUTOGRAD_KWARG(RNNBase, RNNMode, mode, RNNMode::LSTM, RNNMode::LSTM)
   AUTOGRAD_KWARG(RNNBase, uint32_t, nlayers, 1, 1);
   AUTOGRAD_KWARG(RNNBase, bool, no_bias, false, true)
   AUTOGRAD_KWARG(RNNBase, float, dropout, 0, 0)
 
-  bool flatten_parameters();  // Flatten for cudnn
+  bool flatten_parameters(); // Flatten for cudnn
 
   variable_list forward(variable_list) override;
   void initialize_containers() override;
@@ -365,7 +382,8 @@ class RNNBase : public Container_CRTP<Derived> {
   uint32_t hidden_size_;
   uint32_t gate_size_;
   // This is copied from pytorch, to determine whether weights are flat for
-  // the fast CUDNN route. Otherwise, we have to use non flattened weights, which
+  // the fast CUDNN route. Otherwise, we have to use non flattened weights,
+  // which
   // are much slower.
   // https://github.com/pytorch/pytorch/blob/1848cad10802db9fa0aa066d9de195958120d863/torch/nn/modules/rnn.py#L159-L165
   // TODO Actually since we are in C++ we can probably just actually check if
@@ -409,7 +427,7 @@ class RNN : public RNNBase<RNN> {
  public:
   enum Mode { Tanh, Relu };
   RNN(uint32_t inp_size, uint32_t hid_size, Mode mode = Mode::Tanh)
-    : RNNBase(inp_size, hid_size) {
+      : RNNBase(inp_size, hid_size) {
     if (mode == Mode::Tanh) {
       mode_ = RNNBase::RNNMode::RNN_TANH;
     } else if (mode == Mode::Relu) {

@@ -16,7 +16,7 @@ std::map<std::string, Variable> ContainerImpl::parameters() const {
   return ret;
 }
 
-Variable &ContainerImpl::param(std::string const &name) {
+Variable& ContainerImpl::param(std::string const& name) {
   ContainerImpl& container = *this;
   auto begin = 0;
   while (true) {
@@ -110,8 +110,10 @@ Variable& ContainerImpl::add(Variable v, std::string const& name) {
 }
 
 at::Type& ContainerImpl::DefaultTensor(at::ScalarType s) {
-  if (cuda_) return at::CUDA(s);
-  else return at::CPU(s);
+  if (cuda_)
+    return at::CUDA(s);
+  else
+    return at::CPU(s);
 }
 
 variable_list Linear::forward(variable_list input) {
@@ -137,9 +139,11 @@ void Linear::reset_parameters() {
 }
 
 void Linear::initialize_parameters() {
-  weight = this->add(Var(DefaultTensor(at::kFloat).tensor({nout, nin}), true), "weight");
+  weight = this->add(
+      Var(DefaultTensor(at::kFloat).tensor({nout, nin}), true), "weight");
   if (!no_bias_) {
-    bias = this->add(Var(DefaultTensor(at::kFloat).tensor({nout}), true), "bias");
+    bias =
+        this->add(Var(DefaultTensor(at::kFloat).tensor({nout}), true), "bias");
   }
 }
 
@@ -155,14 +159,18 @@ void Embedding::reset_parameters() {
 }
 
 void Embedding::initialize_parameters() {
-  weight = this->add(Var(DefaultTensor(at::kFloat).tensor({num_embeddings, embedding_dim}), true), "weight");
+  weight = this->add(
+      Var(DefaultTensor(at::kFloat).tensor({num_embeddings, embedding_dim}),
+          true),
+      "weight");
 }
 
 void Conv::initialize_parameters() {
   if (!transposed_) {
     for (auto pad : output_padding_) {
       if (pad != 0) {
-        throw std::runtime_error("Only transposed convolutions support output padding!");
+        throw std::runtime_error(
+            "Only transposed convolutions support output padding!");
       }
     }
   }
@@ -176,9 +184,11 @@ void Conv::initialize_parameters() {
     wsize.push_back(in_channels_ / groups_);
   }
   wsize.insert(wsize.end(), ks_.begin(), ks_.end());
-  weight = this->add(Var(DefaultTensor(at::kFloat).tensor(wsize), true), "weight");
+  weight =
+      this->add(Var(DefaultTensor(at::kFloat).tensor(wsize), true), "weight");
   if (!no_bias_) {
-    bias = this->add(Var(DefaultTensor(at::kFloat).tensor({out_channels_}), true), "bias");
+    bias = this->add(
+        Var(DefaultTensor(at::kFloat).tensor({out_channels_}), true), "bias");
   } else {
     assert(!bias.defined());
   }
@@ -186,7 +196,8 @@ void Conv::initialize_parameters() {
 
 void Conv::reset_parameters() {
   auto n = in_channels_;
-  for (auto k : ks_) n *= k;
+  for (auto k : ks_)
+    n *= k;
   auto stdv = 1.0 / std::sqrt(n);
   for (auto& p : parameters()) {
     p.second.data().uniform_(-stdv, stdv);
@@ -197,7 +208,7 @@ variable_list Conv::forward(variable_list input) {
   auto x = input[0];
   if (Nd_ == 1) {
     assert(x.ndimension() == 3);
-    x = x.unsqueeze(-1);  // TODO: Use conv1d once available
+    x = x.unsqueeze(-1); // TODO: Use conv1d once available
   } else if (Nd_ == 2) {
     assert(x.ndimension() == 4);
   } else if (Nd_ == 3) {
@@ -209,13 +220,29 @@ variable_list Conv::forward(variable_list input) {
   Variable out;
   if (Nd_ == 1 || Nd_ == 2) {
     if (transposed_) {
-      out = at::conv_transpose2d(x, weight, bias, stride_, padding_, output_padding_, groups_, dilation_);
+      out = at::conv_transpose2d(
+          x,
+          weight,
+          bias,
+          stride_,
+          padding_,
+          output_padding_,
+          groups_,
+          dilation_);
     } else {
       out = at::conv2d(x, weight, bias, stride_, padding_, dilation_, groups_);
     }
   } else if (Nd_ == 3) {
     if (transposed_) {
-      out = at::conv_transpose3d(x, weight, bias, stride_, padding_, output_padding_, groups_, dilation_);
+      out = at::conv_transpose3d(
+          x,
+          weight,
+          bias,
+          stride_,
+          padding_,
+          output_padding_,
+          groups_,
+          dilation_);
     } else {
       out = at::conv3d(x, weight, bias, stride_, padding_, dilation_, groups_);
     }
@@ -226,8 +253,10 @@ variable_list Conv::forward(variable_list input) {
 
 void BatchNorm::initialize_parameters() {
   if (affine_) {
-    weight = this->add(Var(DefaultTensor(at::kFloat).tensor(num_features_), true), "weight");
-    bias = this->add(Var(DefaultTensor(at::kFloat).tensor(num_features_), true), "bias");
+    weight = this->add(
+        Var(DefaultTensor(at::kFloat).tensor(num_features_), true), "weight");
+    bias = this->add(
+        Var(DefaultTensor(at::kFloat).tensor(num_features_), true), "bias");
   }
 
   if (stateful_) {
@@ -263,9 +292,13 @@ variable_list BatchNorm::forward(variable_list inputs) {
 
   auto output = at::batch_norm(
       input,
-      weight, bias,
-      running_mean, running_var,
-      train_, momentum_, eps_,
+      weight,
+      bias,
+      running_mean,
+      running_var,
+      train_,
+      momentum_,
+      eps_,
       hasCudnn());
 
   return variable_list({output});
@@ -282,10 +315,15 @@ void RNNBase<Derived>::initialize_containers() {
 
   for (auto i = 0U; i < nlayers_; i++) {
     auto input_size = (i == 0) ? input_size_ : hidden_size_;
-    i2h.push_back(this->add(Linear(input_size, gate_size).no_bias(no_bias_).make(), "i2h_" + std::to_string(i)));
-    h2h.push_back(this->add(Linear(hidden_size_, gate_size).no_bias(no_bias_).make(), "h2h_" + std::to_string(i)));
+    i2h.push_back(this->add(
+        Linear(input_size, gate_size).no_bias(no_bias_).make(),
+        "i2h_" + std::to_string(i)));
+    h2h.push_back(this->add(
+        Linear(hidden_size_, gate_size).no_bias(no_bias_).make(),
+        "h2h_" + std::to_string(i)));
   }
-  if (dropout_ > 0) dropout_module = Dropout(dropout_).make();
+  if (dropout_ > 0)
+    dropout_module = Dropout(dropout_).make();
   this->flatten_parameters();
 }
 
@@ -301,8 +339,8 @@ template <typename Derived>
 variable_list RNNBase<Derived>::GRU_cell_forward(variable_list inputs, int i) {
   auto x = inputs[0];
   auto hx = inputs[1].defined()
-    ? inputs[1]
-    : Var(this->DefaultTensor(at::kFloat).zeros({x.size(0), hidden_size_}));
+      ? inputs[1]
+      : Var(this->DefaultTensor(at::kFloat).zeros({x.size(0), hidden_size_}));
 
   auto gi = i2h[i]->forward({x})[0];
   auto gh = h2h[i]->forward({hx})[0];
@@ -318,22 +356,26 @@ variable_list RNNBase<Derived>::GRU_cell_forward(variable_list inputs, int i) {
 }
 
 template <typename Derived>
-variable_list RNNBase<Derived>::RNN_TANH_cell_forward(variable_list inputs, int i) {
+variable_list RNNBase<Derived>::RNN_TANH_cell_forward(
+    variable_list inputs,
+    int i) {
   auto x = inputs[0];
   auto hx = inputs[1].defined()
-    ? inputs[1]
-    : Var(this->DefaultTensor(at::kFloat).zeros({x.size(0), hidden_size_}));
+      ? inputs[1]
+      : Var(this->DefaultTensor(at::kFloat).zeros({x.size(0), hidden_size_}));
 
   auto h = (i2h[i]->forward({x})[0] + h2h[i]->forward({hx})[0]).tanh();
   return variable_list({h});
 }
 
 template <typename Derived>
-variable_list RNNBase<Derived>::RNN_RELU_cell_forward(variable_list inputs, int i) {
+variable_list RNNBase<Derived>::RNN_RELU_cell_forward(
+    variable_list inputs,
+    int i) {
   auto x = inputs[0];
   auto hx = inputs[1].defined()
-    ? inputs[1]
-    : Var(this->DefaultTensor(at::kFloat).zeros({x.size(0), hidden_size_}));
+      ? inputs[1]
+      : Var(this->DefaultTensor(at::kFloat).zeros({x.size(0), hidden_size_}));
 
   auto h = (i2h[i]->forward({x})[0] + h2h[i]->forward({hx})[0]).clamp_min(0);
   return variable_list({h});
@@ -343,8 +385,9 @@ template <typename Derived>
 variable_list RNNBase<Derived>::LSTM_cell_forward(variable_list inputs, int i) {
   auto x = inputs[0];
   auto hid = inputs[1].defined()
-    ? inputs[1]
-    : Var(this->DefaultTensor(at::kFloat).zeros({2, x.size(0), hidden_size_}));
+      ? inputs[1]
+      : Var(this->DefaultTensor(at::kFloat)
+                .zeros({2, x.size(0), hidden_size_}));
   auto hx = hid[0];
   auto cx = hid[1];
 
@@ -364,11 +407,16 @@ variable_list RNNBase<Derived>::LSTM_cell_forward(variable_list inputs, int i) {
 
 template <typename Derived>
 variable_list RNNBase<Derived>::cell_forward(variable_list inputs, int i) {
-  if (mode_ == RNNMode::LSTM) return LSTM_cell_forward(inputs, i);
-  else if (mode_ == RNNMode::GRU) return GRU_cell_forward(inputs, i);
-  else if (mode_ == RNNMode::RNN_TANH) return RNN_TANH_cell_forward(inputs, i);
-  else if (mode_ == RNNMode::RNN_RELU) return RNN_RELU_cell_forward(inputs, i);
-  else throw std::runtime_error("No such RNN mode");
+  if (mode_ == RNNMode::LSTM)
+    return LSTM_cell_forward(inputs, i);
+  else if (mode_ == RNNMode::GRU)
+    return GRU_cell_forward(inputs, i);
+  else if (mode_ == RNNMode::RNN_TANH)
+    return RNN_TANH_cell_forward(inputs, i);
+  else if (mode_ == RNNMode::RNN_RELU)
+    return RNN_RELU_cell_forward(inputs, i);
+  else
+    throw std::runtime_error("No such RNN mode");
 }
 
 template <typename Derived>
@@ -377,13 +425,14 @@ variable_list RNNBase<Derived>::autograd_forward(variable_list inputs) {
 
   std::vector<Tensor> hidden;
   for (size_t i = 0; i < nlayers_; i++) {
-    hidden.push_back(inputs[1].defined()
-        ? inputs[1][i]
-        : tag::Variable());
+    hidden.push_back(inputs[1].defined() ? inputs[1][i] : tag::Variable());
   }
 
-  auto output = Var(this->DefaultTensor(at::kFloat).zeros({inp.size(0), inp.size(1), hidden_size_}), false);
-  for (auto t = 0U; t < inp.size(0); t++ ) {
+  auto output =
+      Var(this->DefaultTensor(at::kFloat)
+              .zeros({inp.size(0), inp.size(1), hidden_size_}),
+          false);
+  for (auto t = 0U; t < inp.size(0); t++) {
     auto x = inp.select(0, t);
     for (size_t i = 0; i < nlayers_; i++) {
       auto layer_output = cell_forward({x, hidden[i]}, i);
@@ -418,8 +467,10 @@ bool RNNBase<Derived>::flatten_parameters() {
     unique_data_ptrs.insert(p.second.data().data_ptr());
   }
   // TODO PyTorch says:
-  // If any parameters alias, we fall back to the slower, copying code path. This is
-  // a sufficient check, because overlapping parameter buffers that don't completely
+  // If any parameters alias, we fall back to the slower, copying code path.
+  // This is
+  // a sufficient check, because overlapping parameter buffers that don't
+  // completely
   // alias would break the assumptions of the uniqueness check in
   // Module.named_parameters().
   // But I'm not sure if this is the case for us
@@ -441,14 +492,14 @@ bool RNNBase<Derived>::flatten_parameters() {
   {
     no_grad_guard guard;
     flat_weight_ = at::_cudnn_rnn_flatten_weight(
-      weight_list,
-      weight_stride0,
-      input_size_,
-      mode_,
-      hidden_size_,
-      nlayers_,
-      false,
-      false); // batch_first and bidirectional, unsupported
+        weight_list,
+        weight_stride0,
+        input_size_,
+        mode_,
+        hidden_size_,
+        nlayers_,
+        false,
+        false); // batch_first and bidirectional, unsupported
   }
   for (auto& p : params) {
     data_ptrs_.emplace_back(p.second.data().data_ptr());
@@ -489,8 +540,9 @@ variable_list RNNBase<Derived>::CUDNN_forward(variable_list inputs) {
   }
   if (weight_data_ptrs != data_ptrs_) {
     std::cerr << "Parameters are unflattened! Code path might be super slow. "
-      "Please call flatten_parameters() when you muck around with storages!"
-      << std::endl;
+                 "Please call flatten_parameters() when you muck around with "
+                 "storages!"
+              << std::endl;
     flat_weight_ = Variable();
   }
 
@@ -511,11 +563,11 @@ variable_list RNNBase<Derived>::CUDNN_forward(variable_list inputs) {
       false, // bidirectional
       {}, // packing not supported
       dropout_state // TODO waiting on dropout state descriptor in C++ pytorch
-      );
+  );
 
   Variable hidout = mode_ == RNNMode::LSTM
-    ? at::stack({std::get<1>(tup), std::get<2>(tup)}, 0)
-    : std::get<1>(tup);
+      ? at::stack({std::get<1>(tup), std::get<2>(tup)}, 0)
+      : std::get<1>(tup);
   Variable output = std::get<0>(tup);
   return variable_list({output, hidout});
 }
@@ -532,8 +584,8 @@ variable_list RNNBase<Derived>::forward(variable_list inputs) {
 
   // Dropout descriptors aren't in C++ in PyTorch yet...
   auto output = at::cudnn_is_acceptable(inp[0]) && dropout_ == 0
-    ? CUDNN_forward(inp)
-    : autograd_forward(inp);
+      ? CUDNN_forward(inp)
+      : autograd_forward(inp);
 
   return output;
 }
@@ -551,22 +603,28 @@ void RNNBase<Derived>::cpu() {
 }
 
 variable_list Dropout::forward(variable_list inputs) {
-  if (p_ == 0 || !this->train_) return inputs;
+  if (p_ == 0 || !this->train_)
+    return inputs;
   variable_list lst;
   for (auto x : inputs) {
     auto noise = x.data().type().tensor(x.sizes());
-    noise = (noise.uniform_(0, 1) > p_).toType(x.type().scalarType()).mul_(1. / (1 - p_));
+    noise = (noise.uniform_(0, 1) > p_)
+                .toType(x.type().scalarType())
+                .mul_(1. / (1 - p_));
     lst.push_back(x * Var(noise));
   }
   return lst;
 }
 
 variable_list Dropout2d::forward(variable_list inputs) {
-  if (p_ == 0 || !this->train_) return inputs;
+  if (p_ == 0 || !this->train_)
+    return inputs;
   variable_list lst;
   for (auto x : inputs) {
     auto noise = x.data().type().tensor({x.size(0), x.size(1), 1, 1});
-    noise = (noise.uniform_(0, 1) > p_).toType(x.type().scalarType()).mul_(1. / (1 - p_));
+    noise = (noise.uniform_(0, 1) > p_)
+                .toType(x.type().scalarType())
+                .mul_(1. / (1 - p_));
     lst.push_back(x * Var(noise));
   }
   return lst;
