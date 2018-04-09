@@ -1,5 +1,30 @@
 #include "test.h"
 
+AUTOGRAD_CONTAINER_CLASS(TestModel) {
+ public:
+  void initialize_containers() override {
+    add(Linear(10, 3).make(), "l1");
+    add(Linear(3, 5).make(), "l2");
+    add(Linear(5, 100).make(), "l3");
+  }
+
+  variable_list forward(variable_list input) override { return input; };
+};
+
+AUTOGRAD_CONTAINER_CLASS(NestedModel) {
+ public:
+  void initialize_containers() override {
+    add(Linear(5, 20).make(), "l1");
+    add(TestModel().make(), "test");
+  }
+
+  void initialize_parameters() override {
+    add(Var(DefaultTensor(at::kFloat).tensor({3, 2, 21}), false), "param");
+  }
+
+  variable_list forward(variable_list input) override { return input; };
+};
+
 CASE("containers/conv2d/even") {
   auto model = Conv2d(3, 2, 3).stride(2).make();
   auto x = Var(at::CPU(at::kFloat).randn({2, 3, 5, 5}), true);
@@ -117,17 +142,6 @@ CASE("containers/linear/simple") {
   EXPECT(x.data().min().toCFloat() == 0);
 };
 
-AUTOGRAD_CONTAINER_CLASS(TestModel) {
- public:
-  void initialize_containers() override {
-    add(Linear(10, 3).make(), "l1");
-    add(Linear(3, 5).make(), "l2");
-    add(Linear(5, 100).make(), "l3");
-  }
-
-  variable_list forward(variable_list input) override { return input; };
-};
-
 CASE("containers/clone") {
   auto model = TestModel().make();
 
@@ -224,3 +238,21 @@ CASE("containers/dropout/1") {
   EXPECT(y.data().sum().toCFloat() == 100);
 };
 
+CASE("containers/param") {
+  auto model = NestedModel().make();
+  EXPECT(model->param("param").size(0) == 3);
+  EXPECT(model->param("param").size(1) == 2);
+  EXPECT(model->param("param").size(2) == 21);
+  EXPECT(model->param("l1.bias").size(0) == 20);
+  EXPECT(model->param("l1.weight").size(0) == 20);
+  EXPECT(model->param("l1.weight").size(1) == 5);
+  EXPECT(model->param("test.l1.bias").size(0) == 3);
+  EXPECT(model->param("test.l1.weight").size(0) == 3);
+  EXPECT(model->param("test.l1.weight").size(1) == 10);
+  EXPECT(model->param("test.l2.bias").size(0) == 5);
+  EXPECT(model->param("test.l2.weight").size(0) == 5);
+  EXPECT(model->param("test.l2.weight").size(1) == 3);
+  EXPECT(model->param("test.l3.bias").size(0) == 100);
+  EXPECT(model->param("test.l3.weight").size(0) == 100);
+  EXPECT(model->param("test.l3.weight").size(1) == 5);
+}

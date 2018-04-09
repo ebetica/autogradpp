@@ -17,28 +17,28 @@ std::map<std::string, Variable> ContainerImpl::parameters() const {
 }
 
 Variable& ContainerImpl::param(std::string const& name) {
-  ContainerImpl& container = *this;
+  ContainerImpl* container = this;
   auto begin = 0;
   while (true) {
     auto dot_pos = name.find('.', begin);
-    if (dot_pos == name.size()) {
+    if (dot_pos == std::string::npos) {
       break;
     }
 
     auto child_name = name.substr(begin, dot_pos - begin);
-    auto it = container.children_.find(child_name);
-    if (it == container.children_.end()) {
+    auto it = container->children_.find(child_name);
+    if (it == container->children_.end()) {
       throw std::runtime_error("No such child: " + child_name);
     }
 
-    container = *(it->second);
+    container = it->second.get();
     begin = dot_pos + 1; // Skip the dot
   }
 
   auto param_name = name.substr(begin);
-  auto it = container.params_.find(param_name);
+  auto it = container->params_.find(param_name);
   if (it == params_.end()) {
-    throw std::runtime_error("No such param: " + name);
+    throw std::runtime_error("No such param: " + param_name);
   }
   return it->second;
 }
