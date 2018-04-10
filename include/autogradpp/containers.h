@@ -173,7 +173,7 @@ AUTOGRAD_CONTAINER_CLASS(Functional) {
  public:
   Functional(std::function<variable_list(variable_list)> fun) : fun_(fun){};
   Functional(std::function<Variable(Variable)> fun)
-      : fun_([&](variable_list input) {
+      : fun_([fun](variable_list input) {
           return variable_list({fun(input[0])});
         }){};
 
