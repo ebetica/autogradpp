@@ -43,6 +43,71 @@ void load(std::string const& path, T& obj) {
   autograd::load(is, obj);
 }
 
+namespace detail {
+
+// We use our own hard-coded type<->id mapping so that serialization is robust
+// wrt changes in ATen; see e.g. https://git.io/vxd6R
+// The mapping is consistent with the ScalarType enum as of pytorch version
+// v0.1.11-7675-ge94c67e.
+inline int32_t scalarTypeId(at::ScalarType type) {
+  switch (type) {
+    case at::ScalarType::Byte: return 0;
+    case at::ScalarType::Char: return 1;
+    case at::ScalarType::Short: return 2;
+    case at::ScalarType::Int: return 3;
+    case at::ScalarType::Long: return 4;
+    case at::ScalarType::Half: return 5;
+    case at::ScalarType::Float: return 6;
+    case at::ScalarType::Double: return 7;
+    case at::ScalarType::Undefined: return 8;
+    default:
+      throw std::runtime_error(
+          "Unknown scalar type: " + std::to_string(static_cast<int>(type)));
+  }
+}
+
+inline at::ScalarType scalarTypeFromId(int32_t id) {
+  switch (id) {
+    case 0: return at::ScalarType::Byte;
+    case 1: return at::ScalarType::Char;
+    case 2: return at::ScalarType::Short;
+    case 3: return at::ScalarType::Int;
+    case 4: return at::ScalarType::Long;
+    case 5: return at::ScalarType::Half;
+    case 6: return at::ScalarType::Float;
+    case 7: return at::ScalarType::Double;
+    case 8: return at::ScalarType::Undefined;
+    default:
+      throw std::runtime_error("Unknown scalar type id: " + std::to_string(id));
+  }
+}
+
+inline int32_t backendId(at::Backend backend) {
+  switch (backend) {
+    case at::Backend::CPU: return 0;
+    case at::Backend::CUDA: return 1;
+    case at::Backend::SparseCPU: return 2;
+    case at::Backend::SparseCUDA: return 3;
+    case at::Backend::Undefined: return 4;
+    default:
+      throw std::runtime_error(
+          "Unknown backend: " + std::to_string(static_cast<int>(backend)));
+  }
+}
+
+inline at::Backend backendFromId(int32_t id) {
+  switch (id) {
+    case 0: return at::Backend::CPU;
+    case 1: return at::Backend::CUDA;
+    case 2: return at::Backend::SparseCPU;
+    case 3: return at::Backend::SparseCUDA;
+    case 4: return at::Backend::Undefined;
+    default:
+      throw std::runtime_error("Unknown backend id: " + std::to_string(id));
+  }
+}
+
+} // namespace detail
 } // namespace autograd
 
 // This is super ugly and I don't know how to simplify it
@@ -67,8 +132,7 @@ template <class Archive>
 void saveBinary(Archive& archive, void const* data, std::size_t size) {
   // In general, there's no direct `saveBinary`-like method on archives
   std::vector<char> v(
-      reinterpret_cast<char const*>(data),
-      reinterpret_cast<char const*>(data) + size);
+      static_cast<char const*>(data), static_cast<char const*>(data) + size);
   archive(v);
 }
 template <>
@@ -98,12 +162,12 @@ loadBinary(BinaryInputArchive& archive, void* data, std::size_t size) {
 template <class Archive>
 void save(Archive& archive, at::Tensor const& tensor) {
   if (!tensor.defined()) {
-    auto type = at::ScalarType::Undefined;
-    archive(CEREAL_NVP(type));
+    int32_t typeId = ::autograd::detail::scalarTypeId(at::ScalarType::Undefined);
+    archive(CEREAL_NVP(typeId));
     return;
   } else {
-    auto type = tensor.type().scalarType();
-    archive(CEREAL_NVP(type));
+    int32_t typeId = ::autograd::detail::scalarTypeId(tensor.type().scalarType());
+    archive(CEREAL_NVP(typeId));
   }
   auto sizes = std::vector<int64_t>();
   auto buf = std::vector<uint8_t>();
@@ -112,7 +176,7 @@ void save(Archive& archive, at::Tensor const& tensor) {
   }
   auto contig = tensor.toBackend(at::kCPU).contiguous();
   uint64_t size = tensor.numel() * tensor.type().elementSizeInBytes();
-  at::Backend backend = tensor.type().backend();
+  int32_t backend = ::autograd::detail::backendId(tensor.type().backend());
 
   archive(CEREAL_NVP(backend), CEREAL_NVP(sizes), CEREAL_NVP(size));
   agimpl::saveBinary(
@@ -130,18 +194,21 @@ void save(Archive& archive, at::Tensor const& tensor) {
 template <class Archive>
 void load(Archive& archive, at::Tensor& tensor) {
   at::ScalarType type;
-  archive(CEREAL_NVP(type));
+  int32_t typeId;
+  archive(CEREAL_NVP(typeId));
+  type = ::autograd::detail::scalarTypeFromId(typeId);
   if (type == at::ScalarType::Undefined) {
     tensor = at::Tensor();
     return;
   }
 
-  at::Backend backend;
+  int32_t backendId;
   auto sizes = std::vector<int64_t>();
   auto buf = std::vector<uint8_t>();
   uint64_t size;
-  archive(CEREAL_NVP(backend), CEREAL_NVP(sizes), CEREAL_NVP(size));
+  archive(CEREAL_NVP(backendId), CEREAL_NVP(sizes), CEREAL_NVP(size));
 
+  at::Backend backend = ::autograd::detail::backendFromId(backendId);
   if (!tensor.defined() || tensor.type().scalarType() != type) {
     tensor = at::getType(backend, type).tensor();
   }
