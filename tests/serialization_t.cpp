@@ -54,6 +54,66 @@ CASE("serialization/portable_binary") {
   EXPECT(x.allclose(y));
 }
 
+CASE("serialization/resized") {
+  auto x = at::CPU(at::kFloat).randn({11, 5});
+  x.resize_({5, 5});
+  auto y = at::Tensor();
+
+  std::stringstream ss;
+  {
+    cereal::BinaryOutputArchive archive(ss);
+    archive(x);
+  }
+  {
+    cereal::BinaryInputArchive archive(ss);
+    archive(y);
+  }
+
+  EXPECT(y.defined());
+  EXPECT(x.sizes().vec() == y.sizes().vec());
+  EXPECT(x.allclose(y));
+}
+
+CASE("serialization/sliced") {
+  auto x = at::CPU(at::kFloat).randn({11, 5});
+  x = x.slice(0, 1, 3);
+  auto y = at::Tensor();
+
+  std::stringstream ss;
+  {
+    cereal::BinaryOutputArchive archive(ss);
+    archive(x);
+  }
+  {
+    cereal::BinaryInputArchive archive(ss);
+    archive(y);
+  }
+
+  EXPECT(y.defined());
+  EXPECT(x.sizes().vec() == y.sizes().vec());
+  EXPECT(x.allclose(y));
+}
+
+CASE("serialization/noncontig") {
+  auto x = at::CPU(at::kFloat).randn({11, 5});
+  x = x.slice(1, 1, 4);
+  auto y = at::Tensor();
+
+  std::stringstream ss;
+  {
+    cereal::BinaryOutputArchive archive(ss);
+    archive(x);
+  }
+  {
+    cereal::BinaryInputArchive archive(ss);
+    archive(y);
+  }
+
+  EXPECT(y.defined());
+  EXPECT(x.sizes().vec() == y.sizes().vec());
+  EXPECT(x.allclose(y));
+}
+
 CASE("serialization/xor") {
   // We better be able to save and load a XOR model!
   auto makeModel = []() {
