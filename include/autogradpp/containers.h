@@ -173,8 +173,8 @@ AUTOGRAD_CONTAINER_CLASS(Functional) {
  public:
   Functional(std::function<variable_list(variable_list)> fun) : fun_(fun){};
   Functional(std::function<Variable(Variable)> fun)
-      : fun_([&](variable_list input) {
-          return variable_list({fun(input[0])});
+      : fun_([f = std::move(fun)](variable_list input) {
+          return variable_list({f(input[0])});
         }){};
 
   variable_list forward(variable_list input) override {
