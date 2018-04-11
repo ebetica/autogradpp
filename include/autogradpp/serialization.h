@@ -175,14 +175,13 @@ void save(Archive& archive, at::Tensor const& tensor) {
     sizes.push_back(s);
   }
   auto contig = tensor.toBackend(at::kCPU).contiguous();
-  uint64_t size = tensor.numel() * tensor.type().elementSizeInBytes();
   int32_t backend = ::autograd::detail::backendId(tensor.type().backend());
 
-  archive(CEREAL_NVP(backend), CEREAL_NVP(sizes), CEREAL_NVP(size));
+  archive(CEREAL_NVP(backend), CEREAL_NVP(sizes));
   agimpl::saveBinary(
       archive,
       contig.data_ptr(),
-      size);
+      tensor.numel() * tensor.type().elementSizeInBytes());
 }
 
 /**
@@ -205,8 +204,7 @@ void load(Archive& archive, at::Tensor& tensor) {
   int32_t backendId;
   auto sizes = std::vector<int64_t>();
   auto buf = std::vector<uint8_t>();
-  uint64_t size;
-  archive(CEREAL_NVP(backendId), CEREAL_NVP(sizes), CEREAL_NVP(size));
+  archive(CEREAL_NVP(backendId), CEREAL_NVP(sizes));
 
   at::Backend backend = ::autograd::detail::backendFromId(backendId);
   if (!tensor.defined() || tensor.type().scalarType() != type) {
@@ -214,18 +212,19 @@ void load(Archive& archive, at::Tensor& tensor) {
   }
   tensor.resize_(sizes);
 
-  // Backward compatibility with older code that used to save "size" as the
-  // total size of the underlying storage
-  size = std::min(
-      size, tensor.numel() * tensor.type().elementSizeInBytes());
-
   if (tensor.type().is_cuda()) {
     // should actually use cudamemcpy probably
     auto cputensor = at::CPU(tensor.type().scalarType()).tensor(sizes);
-    agimpl::loadBinary(archive, cputensor.data_ptr(), size);
+    agimpl::loadBinary(
+        archive,
+        cputensor.data_ptr(),
+        cputensor.numel() * cputensor.type().elementSizeInBytes());
     tensor.copy_(cputensor);
   } else {
-    agimpl::loadBinary(archive, tensor.data_ptr(), size);
+    agimpl::loadBinary(
+        archive,
+        tensor.data_ptr(),
+        tensor.numel() * tensor.type().elementSizeInBytes());
   }
 }
 
