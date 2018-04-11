@@ -16,6 +16,36 @@ CASE("serialization/undefined") {
   EXPECT(!y.defined());
 }
 
+CASE("serialization/cputypes") {
+  for (int i = 0; i < static_cast<int>(at::ScalarType::NumOptions); i++) {
+    if (i == static_cast<int>(at::ScalarType::Half)) {
+      // XXX can't serialize half tensors at the moment since contiguous() is
+      // not implemented for this type;
+      continue;
+    } else if (i == static_cast<int>(at::ScalarType::Undefined)) {
+      // We can't construct a tensor for this type. This is tested in
+      // serialization/undefined anyway.
+      continue;
+    }
+
+    auto x =
+        at::getType(at::kCPU, static_cast<at::ScalarType>(i)).ones({5, 5});
+    auto y = at::Tensor();
+
+    std::stringstream ss;
+    save(ss, &x);
+    load(ss, &y);
+
+    EXPECT(y.defined());
+    EXPECT(x.sizes().vec() == y.sizes().vec());
+    if (at::isIntegralType(static_cast<at::ScalarType>(i))) {
+      EXPECT(x.equal(y));
+    } else {
+      EXPECT(x.allclose(y));
+    }
+  }
+}
+
 CASE("serialization/binary") {
   auto x = at::CPU(at::kFloat).randn({5, 5});
   auto y = at::Tensor();
