@@ -1,4 +1,6 @@
 #include "test.h"
+#include "cuda.h"
+#include <thread>
 
 CASE("misc/no_grad/1") {
   no_grad_guard guard;
@@ -32,4 +34,20 @@ CASE("misc/random/seed_cuda") {
 
   auto l_inf = (x1.data() - x2.data()).abs().max().toCFloat();
   EXPECT(l_inf < 1e-10);
+};
+
+void makeRandomNumber() {
+  cudaSetDevice(std::rand() % 2);
+  auto x = at::CUDA(at::kFloat).randn({1000});
+  std::cout << x.sum() << std::endl;
+}
+
+CASE("misc/derp") {
+  auto threads = std::vector<std::thread>();
+  for (auto i = 0; i < 1000; i++) {
+    threads.emplace_back(makeRandomNumber);
+  }
+  for (auto& t : threads) {
+    t.join();
+  }
 };
