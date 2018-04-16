@@ -85,6 +85,11 @@ class Container_CRTP : public ContainerImpl {
     for (auto& param : parameters()) {
       newParams[param.first].data().copy_(param.second.data());
     }
+    if (cuda_) {
+      ptr->cuda();
+    } else {
+      ptr->cpu();
+    }
     return ptr;
   }
 };
