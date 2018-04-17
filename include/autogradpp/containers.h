@@ -18,7 +18,9 @@ class ContainerImpl {
   virtual void initialize_parameters(){};
   virtual void reset_parameters(){};
 
-  virtual variable_list forward(variable_list) = 0;
+  std::function<Variant(Variant const&)> functor();
+  Variant forward(Variant&&); // This is just directly forwards
+  virtual Variant forward(Variant const&) = 0;
   virtual Container clone() const = 0;
 
   std::map<std::string, Variable> parameters() const;
@@ -99,7 +101,7 @@ class ContainerListImpl : public Container_CRTP<Derived> {
   // Lets you use a container like a vector without making a new class,
   // just for simple implementations
  public:
-  virtual variable_list forward(variable_list) override {
+  virtual Variant forward(Variant const&) override {
     throw std::runtime_error(
         "ContainerList has no forward, maybe you"
         " wanted to subclass and override this function?");
@@ -139,9 +141,10 @@ class ContainerList : public ContainerListImpl<ContainerList> {};
 class Sequential : public ContainerListImpl<Sequential> {
   // Mimics nn.Sequential from pytorch.
  public:
-  variable_list forward(variable_list input) override {
+  Variant forward(Variant const& input) override {
+    Variant x = input;
     for (auto& container : children_) {
-      input = container->forward(input);
+      x = container->forward(std::move(x));
     }
     return input;
   }
@@ -164,7 +167,7 @@ AUTOGRAD_CONTAINER_CLASS(SimpleContainer) {
   // Lets you use a container without making a new class,
   // for experimental implementations
  public:
-  virtual variable_list forward(variable_list) override {
+  virtual Variant forward(Variant const&) override {
     throw std::runtime_error(
         "SimpleContainer has no forward, maybe you"
         " wanted to subclass and override this function?");
@@ -176,24 +179,20 @@ AUTOGRAD_CONTAINER_CLASS(Functional) {
   // Lets you create a container from a function, designed for use in
   // Sequential.
  public:
-  Functional(std::function<variable_list(variable_list)> fun) : fun_(fun){};
-  Functional(std::function<Variable(Variable)> fun)
-      : fun_([f = std::move(fun)](variable_list input) {
-          return variable_list({f(input[0])});
-        }){};
+  Functional(std::function<Variant(Variant)> fun) : fun_(fun){};
 
-  variable_list forward(variable_list input) override {
+  Variant forward(Variant const& input) override {
     return fun_(input);
   };
 
-  std::function<variable_list(variable_list)> fun_;
+  std::function<Variant(Variant)> fun_;
 };
 
 AUTOGRAD_CONTAINER_CLASS(Linear) {
  public:
   Linear(uint32_t nin, uint32_t nout) : nin(nin), nout(nout) {}
 
-  variable_list forward(variable_list) override;
+  Variant forward(Variant const&) override;
   void reset_parameters() override;
   void initialize_parameters() override;
   AUTOGRAD_KWARG(Linear, bool, no_bias, false, true);
@@ -207,7 +206,7 @@ AUTOGRAD_CONTAINER_CLASS(Embedding) {
   Embedding(uint32_t num_embeddings, uint32_t embedding_dim)
       : num_embeddings(num_embeddings), embedding_dim(embedding_dim) {}
 
-  variable_list forward(variable_list) override;
+  Variant forward(Variant const&) override;
   void reset_parameters() override;
   void initialize_parameters() override;
 
@@ -239,7 +238,7 @@ AUTOGRAD_CONTAINER_CLASS(Conv) {
   }
 
   void reset_parameters() override;
-  variable_list forward(variable_list) override;
+  Variant forward(Variant const&) override;
   void initialize_parameters() override;
 
   template <typename T>
@@ -323,7 +322,7 @@ AUTOGRAD_CONTAINER_CLASS(BatchNorm) {
   AUTOGRAD_KWARG(BatchNorm, bool, stateful, false, true)
 
   void reset_parameters() override;
-  variable_list forward(variable_list) override;
+  Variant forward(Variant const&) override;
   void initialize_parameters() override;
 
   Variable weight;
@@ -340,7 +339,7 @@ AUTOGRAD_CONTAINER_CLASS(Dropout) {
   Dropout(double p = 0.5) : p_(p) {
     assert(p < 1 && p >= 0);
   }
-  variable_list forward(variable_list) override;
+  Variant forward(Variant const&) override;
 
  protected:
   double p_;
@@ -351,7 +350,7 @@ AUTOGRAD_CONTAINER_CLASS(Dropout2d) {
   Dropout2d(double p = 0.5) : p_(p) {
     assert(p < 1 && p >= 0);
   }
-  variable_list forward(variable_list) override;
+  Variant forward(Variant const&) override;
 
  protected:
   double p_;
@@ -372,7 +371,7 @@ class RNNBase : public Container_CRTP<Derived> {
 
   bool flatten_parameters(); // Flatten for cudnn
 
-  variable_list forward(variable_list) override;
+  Variant forward(Variant const&) override;
   void initialize_containers() override;
   void reset_parameters() override;
 
@@ -397,14 +396,14 @@ class RNNBase : public Container_CRTP<Derived> {
   Variable flat_weight_;
   Container dropout_module;
 
-  variable_list CUDNN_forward(variable_list);
-  variable_list autograd_forward(variable_list);
+  Variant CUDNN_forward(Variant&&);
+  Variant autograd_forward(Variant&&);
 
-  variable_list cell_forward(variable_list, int);
-  variable_list LSTM_cell_forward(variable_list, int);
-  variable_list GRU_cell_forward(variable_list, int);
-  variable_list RNN_RELU_cell_forward(variable_list, int);
-  variable_list RNN_TANH_cell_forward(variable_list, int);
+  Variant cell_forward(Variant&&, int);
+  Variant LSTM_cell_forward(Variant&&, int);
+  Variant GRU_cell_forward(Variant&&, int);
+  Variant RNN_RELU_cell_forward(Variant&&, int);
+  Variant RNN_TANH_cell_forward(Variant&&, int);
 };
 
 // We must instantiate these templates so we can put implementations in the .cpp

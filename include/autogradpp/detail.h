@@ -3,6 +3,8 @@
 #include <map>
 #include <memory>
 
+#include <mapbox/variant.hpp>
+
 #include "torch/csrc/autograd/engine.h"
 #include "torch/csrc/autograd/grad_mode.h"
 
@@ -33,10 +35,79 @@ extern tag::Engine engine;
 class ContainerImpl;
 class OptimizerImpl;
 using Variable = tag::Variable;
-using variable_list = tag::variable_list;
 using Tensor = at::Tensor;
 using Container = std::shared_ptr<ContainerImpl>;
 using Optimizer = std::shared_ptr<OptimizerImpl>;
+
+#define GEN_TYPE(TYP, NAME) \
+  Variant(TYP);             \
+  bool is ## NAME () const; \
+  TYP get ## NAME () const;
+
+class Variant {
+ public:
+  Variant(Tensor);
+  Variant(Variable);
+  Variant(const std::string&);
+  Variant(std::vector<Variant>&);
+  Variant(std::vector<Variant>&&);
+  Variant(std::initializer_list<Variable>);
+  Variant(std::unordered_map<std::string, Variant>&);
+  Variant(std::unordered_map<std::string, Variant>&&);
+
+  Variable const&                                       get() const;
+  std::string const&                                    getString() const;
+  std::vector<Variant> const&                           getList() const;
+  std::unordered_map<std::string, Variant> const&       getDict() const;
+  bool                                                  isVariable() const;
+  bool                                                  isString() const;
+  bool                                                  isList() const;
+  bool                                                  isDict() const;
+  GEN_TYPE(float,      Float);
+  GEN_TYPE(double,     Double);
+  GEN_TYPE(bool,       Bool);
+  GEN_TYPE(int32_t,    Int32);
+  GEN_TYPE(int64_t,    Int64);
+
+  /* These functions will automatically assume you did a .get() */
+  // The contract for these will be: If you cannot find it in functions.h, you
+  // should define it here. If it's not here then it's a bug.
+  template <typename F, typename... Args> 
+  auto m(F func, Args&&... params) const {
+    return func(get(), params...);
+  } 
+  template <typename T> Variable operator+(T other) const { return get() + other; }
+  template <typename T> Variable operator-(T other) const { return get() * other; }
+  template <typename T> Variable operator*(T other) const { return get() - other; }
+  template <typename T> Variable operator/(T other) const { return get() / other; }
+  template <typename T>
+  Variable operator[](T other) const { return get()[other]; }
+
+  Tensor const& data() const;
+  bool defined() const;
+  Variable detach() const;
+  at::Type& type() const;
+
+ private:
+  mapbox::util::variant<
+    Variable,
+    std::string,
+    float,
+    double, 
+    bool, 
+    int32_t,
+    int64_t,
+    mapbox::util::recursive_wrapper<std::vector<Variant>>,
+    mapbox::util::recursive_wrapper<std::unordered_map<std::string, Variant>>
+      > variant_;
+};
+
+template<> inline Variable Variant::operator+(Variant other) const { return get() + other.get(); }
+template<> inline Variable Variant::operator-(Variant other) const { return get() - other.get(); }
+template<> inline Variable Variant::operator*(Variant other) const { return get() * other.get(); }
+template<> inline Variable Variant::operator/(Variant other) const { return get() / other.get(); }
+
+#undef GEN_TYPE
 
 void backward(Tensor loss, bool keep_graph = false);
 

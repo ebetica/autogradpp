@@ -205,16 +205,16 @@ CASE("integration/RL/cartpole") {
   std::vector<Variable> saved_values;
   std::vector<float> rewards;
 
-  auto forward = [&](variable_list inp) {
-    auto x = linear->forward(inp)[0].clamp_min(0);
-    Variable actions = policyHead->forward({x})[0];
-    Variable value = valueHead->forward({x})[0];
+  auto forward = [&](Variant inp) {
+    auto x = linear->forward(inp).m(at::relu);
+    auto actions = policyHead->forward(x).get();
+    auto value = valueHead->forward(x).get();
     return std::make_tuple(at::softmax(actions, -1), value);
   };
 
    auto selectAction = [&](at::Tensor state) {
      // Only work on single state right now, change index to gather for batch
-     auto out = forward({Var(state, false)});
+     auto out = forward(Var(state, false));
      auto probs = Variable(std::get<0>(out));
      auto value = Variable(std::get<1>(out));
      auto action = probs.data().multinomial(1)[0].toCInt();
