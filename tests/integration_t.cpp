@@ -295,16 +295,17 @@ CASE("integration/mnist") {  // ~ will make it run last :D
   auto linear2 = model->add(Linear(50, 10).make(), "linear2");
 
   auto forward = [&](Variable x) {
-    x = std::get<0>(at::max_pool2d(conv1->forward({x})[0], {2, 2})).clamp_min(0);
-    x = conv2->forward({x})[0];
-    x = drop2d->forward({x})[0];
-    x = std::get<0>(at::max_pool2d(x, {2, 2})).clamp_min(0);
+    x = at::relu(std::get<0>(at::max_pool2d(conv1->forward(x).get(), {2, 2})))
+      .m(conv2->functor())
+      .m(drop2d->functor())
+      .get();
+    x = at::relu(std::get<0>(at::max_pool2d(x, {2, 2})));
 
-    x = x.view({-1, 320});
-    x = linear1->forward({x})[0].clamp_min(0);
-    x = drop->forward({x})[0];
-    x = linear2->forward({x})[0];
-    x = at::log_softmax(x, 1);
+    x = x.view({-1, 320})
+      .m(linear1->functor()).m(at::relu)
+      .m(drop->functor())
+      .m(linear2->functor())
+      .m(at::log_softmax, 1);
     return x;
   };
 
@@ -332,16 +333,17 @@ CASE("integration/mnist_batchnorm") {  // ~ will make it run last :D
   auto linear2 = model->add(Linear(50, 10).make(), "linear2");
 
   auto forward = [&](Variable x) {
-    x = std::get<0>(at::max_pool2d(conv1->forward({x})[0], {2, 2})).clamp_min(0);
-    x = batchnorm2d->forward({x})[0];
-    x = conv2->forward({x})[0];
-    x = std::get<0>(at::max_pool2d(x, {2, 2})).clamp_min(0);
+    x = at::relu(std::get<0>(at::max_pool2d(conv1->forward(x).get(), {2, 2})))
+      .m(batchnorm2d->functor())
+      .m(conv2->functor())
+      .get();
+    x = at::relu(std::get<0>(at::max_pool2d(x, {2, 2})));
 
-    x = x.view({-1, 320});
-    x = linear1->forward({x})[0].clamp_min(0);
-    x = batchnorm1->forward({x})[0];
-    x = linear2->forward({x})[0];
-    x = at::log_softmax(x, 1);
+    x = x.view({-1, 320})
+      .m(linear1->functor()).m(at::relu)
+      .m(batchnorm1->functor())
+      .m(linear2->functor())
+      .m(at::log_softmax, 1);
     return x;
   };
 

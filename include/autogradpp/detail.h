@@ -74,7 +74,7 @@ class Variant {
   // should define it here. If it's not here then it's a bug.
   template <typename F, typename... Args> 
   auto m(F func, Args&&... params) const {
-    return func(get(), params...);
+    return func(get(), std::forward<Args>(params)...);
   } 
   template <typename T> Variable operator+(T other) const { return get() + other; }
   template <typename T> Variable operator-(T other) const { return get() * other; }

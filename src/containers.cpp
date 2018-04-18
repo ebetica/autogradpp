@@ -358,8 +358,8 @@ Variant RNNBase<Derived>::GRU_cell_forward(Variant&& inputs, int i) {
       ? lst[1].get()
       : Var(x.data().type().zeros({x.size(0), hidden_size_}));
 
-  auto gi = i2h[i]->forward({x}).get();
-  auto gh = h2h[i]->forward({hx}).get();
+  auto gi = i2h[i]->forward(x).get();
+  auto gh = h2h[i]->forward(hx).get();
   auto gic = gi.chunk(3, 1);
   auto ghc = gh.chunk(3, 1);
 
@@ -381,8 +381,8 @@ Variant RNNBase<Derived>::RNN_TANH_cell_forward(
       ? lst[1].get()
       : Var(x.data().type().zeros({x.size(0), hidden_size_}));
 
-  auto h = (i2h[i]->forward({x}).get() + h2h[i]->forward({hx}).get()).tanh();
-  return h;
+  auto h = i2h[i]->forward(x) + h2h[i]->forward(hx);
+  return h.tanh();
 }
 
 template <typename Derived>
@@ -395,8 +395,8 @@ Variant RNNBase<Derived>::RNN_RELU_cell_forward(
       ? lst[1].get()
       : Var(x.data().type().zeros({x.size(0), hidden_size_}));
 
-  auto h = at::relu(i2h[i]->forward({x}).get() + h2h[i]->forward({hx}).get());
-  return h;
+  auto h = i2h[i]->forward(x) + h2h[i]->forward(hx);
+  return at::relu(h);
 }
 
 template <typename Derived>
@@ -541,7 +541,7 @@ Variant RNNBase<Derived>::CUDNN_forward(Variant&& inputs) {
   auto lst = inputs.getList();
   auto x = lst[0].get();
   Variable hx, cx;
-  if (!inputs[1].defined()) {
+  if (!lst[1].defined()) {
     hx = x.type().zeros({nlayers_, x.size(1), hidden_size_});
     if (mode_ == RNNMode::LSTM) {
       cx = x.type().zeros({nlayers_, x.size(1), hidden_size_});
@@ -595,10 +595,14 @@ template <typename Derived>
 Variant RNNBase<Derived>::forward(Variant const& input) {
   std::vector<Variant> inp;
   if (input.isList()) {
-    inp.push_back(input[0]);
-    inp.push_back(input[1]);
+    auto lst = input.getList();
+    if (lst.size() != 2) {
+      throw std::runtime_error("RNN takes a list of the input and hidden");
+    }
+    inp.push_back(lst[0]);
+    inp.push_back(lst[1]);
   } else {
-    inp.push_back(input[0]);
+    inp.push_back(input.get());
     inp.push_back(Variable());
   }
 
@@ -631,7 +635,7 @@ Variant Dropout::forward(Variant const& inputs) {
       .m([](const Tensor& self, float other) { return self > other;}, p_)
       .toType(x.type().scalarType())
       .mul_(1. / (1 - p_));
-    return noise;
+    return x * Var(noise);
   } else if (inputs.isList()) {
     std::vector<Variant> lst;
     for (auto& var : inputs.getList()) {
@@ -656,8 +660,9 @@ Variant Dropout2d::forward(Variant const& inputs) {
     auto x = inputs.get();
     auto noise = x.data().type().tensor({x.size(0), x.size(1), 1, 1})
       .m([](const Tensor& self, at::Scalar other) { return self > other;}, p_)
+      .toType(x.type().scalarType())
       .mul_(1. / (1 - p_));
-    return noise;
+    return x * Var(noise);
   } else if (inputs.isList()) {
     std::vector<Variant> lst;
     for (auto& var : inputs.getList()) {
