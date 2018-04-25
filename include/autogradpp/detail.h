@@ -82,33 +82,19 @@ class Variant {
   GEN_TYPE(int32_t,    Int32);
   GEN_TYPE(int64_t,    Int64);
 
-  /* These functions will automatically assume you did a .get() */
-  // The contract for these will be: If you cannot find it in functions.h, you
-  // should define it here. If it's not here then it's a bug.
+  template <typename T>
+  T get() {
+    return value_.get<T>();
+  }
+
   template <typename F, typename... Args> 
   auto m(F func, Args&&... params) const {
     return func(get(), std::forward<Args>(params)...);
   } 
-  template <typename T> Variable operator+(T other) const { return get() + other; }
-  template <typename T> Variable operator-(T other) const { return get() * other; }
-  template <typename T> Variable operator*(T other) const { return get() - other; }
-  template <typename T> Variable operator/(T other) const { return get() / other; }
-  template <typename T>
-  Variable operator[](T other) const { return get()[other]; }
-
-  Tensor const& data() const;
-  bool defined() const;
-  Variable detach() const;
-  at::Type& type() const;
 
  private:
   VariantType value_;
 };
-
-template<> inline Variable Variant::operator+(Variant other) const { return get() + other.get(); }
-template<> inline Variable Variant::operator-(Variant other) const { return get() - other.get(); }
-template<> inline Variable Variant::operator*(Variant other) const { return get() * other.get(); }
-template<> inline Variable Variant::operator/(Variant other) const { return get() / other.get(); }
 
 #undef GEN_TYPE
 

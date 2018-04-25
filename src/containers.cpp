@@ -381,7 +381,7 @@ Variant RNNBase<Derived>::RNN_TANH_cell_forward(
       ? lst[1].get()
       : Var(x.data().type().zeros({x.size(0), hidden_size_}));
 
-  auto h = i2h[i]->forward(x) + h2h[i]->forward(hx);
+  auto h = i2h[i]->forward(x).get() + h2h[i]->forward(hx).get();
   return h.tanh();
 }
 
@@ -395,7 +395,7 @@ Variant RNNBase<Derived>::RNN_RELU_cell_forward(
       ? lst[1].get()
       : Var(x.data().type().zeros({x.size(0), hidden_size_}));
 
-  auto h = i2h[i]->forward(x) + h2h[i]->forward(hx);
+  auto h = i2h[i]->forward(x).get() + h2h[i]->forward(hx).get();
   return at::relu(h);
 }
 
@@ -409,7 +409,7 @@ Variant RNNBase<Derived>::LSTM_cell_forward(Variant&& inputs, int i) {
   auto hx = hid[0];
   auto cx = hid[1];
 
-  auto gates = i2h[i]->forward(x) + h2h[i]->forward(hx);
+  auto gates = i2h[i]->forward(x).get() + h2h[i]->forward(hx).get();
 
   auto chunked = gates.chunk(4, 1);
   auto in_gate = chunked[0].sigmoid();
@@ -444,7 +444,8 @@ Variant RNNBase<Derived>::autograd_forward(Variant&& inputs) {
 
   std::vector<Tensor> hidden;
   for (size_t i = 0; i < nlayers_; i++) {
-    hidden.emplace_back(lst[1].defined() ? lst[1][i] : tag::Variable());
+    auto v = lst[1].get();
+    hidden.emplace_back(v.defined() ? v[i] : tag::Variable());
   }
 
   auto output =
@@ -541,14 +542,19 @@ Variant RNNBase<Derived>::CUDNN_forward(Variant&& inputs) {
   auto lst = inputs.getList();
   auto x = lst[0].get();
   Variable hx, cx;
-  if (!lst[1].defined()) {
+  if (!lst[1].get().defined()) {
     hx = x.type().zeros({nlayers_, x.size(1), hidden_size_});
     if (mode_ == RNNMode::LSTM) {
       cx = x.type().zeros({nlayers_, x.size(1), hidden_size_});
     }
   } else {
-    hx = mode_ == RNNMode::LSTM ? inputs[1][0] : inputs[1];
-    cx = mode_ == RNNMode::LSTM ? inputs[1][1] : Variable();
+    if (mode_ == RNNMode::LSTM) {
+      hx = lst[1].get()[0];
+      cx = lst[1].get()[1];
+    } else {
+      hx = lst[1].get();
+      cx = Variable();
+    }
   }
   auto dropout_state = x.type().tensor();
 

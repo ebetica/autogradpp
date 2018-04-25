@@ -115,19 +115,6 @@ GEN_TYPE(bool,       Bool);
 GEN_TYPE(int32_t,    Int32);
 GEN_TYPE(int64_t,    Int64);
 
-Tensor const& Variant::data() const {
-  return get().data();
-}
-bool Variant::defined() const {
-  return get().defined();
-}
-Variable Variant::detach() const {
-  return get().detach();
-}
-at::Type& Variant::type() const {
-  return get().type();
-}
-
 #undef GEN_TYPE
 
 } // namespace autograd

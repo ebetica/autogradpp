@@ -15,7 +15,7 @@ bool test_RNN_xor(Func&& model_maker, bool cuda = false) {
     auto B = x.size(1);
     x = x.view({T * B, 1});
     x = l1->forward(x).get().view({T, B, nhid}).tanh_()
-      .m(rnn->functor()).getList()[0][T-1]
+      .m(rnn->functor()).getList()[0].get()[T-1]
       .m(lo->functor()).get();
     return x;
   };
@@ -80,7 +80,7 @@ CASE("RNN/LSTM/sizes") {
   // Something is in the hiddens
   EXPECT(hids.norm().toCFloat() > 0);
 
-  Variable diff = model->forward({x, hids}).getList()[1] - hids;
+  Variable diff = model->forward({x, hids}).getList()[1].get() - hids;
 
   // Hiddens changed
   EXPECT(diff.data().abs().sum().toCFloat() > 1e-3);
@@ -110,7 +110,7 @@ CASE("RNN/LSTM/outputs") {
   EXPECT(out[0].get().size(1) == 4);
   EXPECT(out[0].get().size(2) == 2);
 
-  auto flat = out[0].data().view(3*4*2);
+  auto flat = out[0].get().data().view(3*4*2);
   float c_out[] =  {0.4391, 0.5402, 0.4330, 0.5324, 0.4261, 0.5239, 0.4183, 
     0.5147, 0.6822, 0.8064, 0.6726, 0.7968, 0.6620, 0.7860, 0.6501, 0.7741, 
     0.7889, 0.9003, 0.7769, 0.8905, 0.7635, 0.8794, 0.7484, 0.8666};
@@ -123,7 +123,7 @@ CASE("RNN/LSTM/outputs") {
   EXPECT(out[1].get().size(1) == 2);
   EXPECT(out[1].get().size(2) == 4);
   EXPECT(out[1].get().size(3) == 2);
-  flat = out[1].data().view(16);
+  flat = out[1].get().data().view(16);
   float h_out[] = {0.7889, 0.9003, 0.7769, 0.8905, 0.7635, 0.8794, 0.7484,
     0.8666, 1.1647, 1.6106, 1.1425, 1.5726, 1.1187, 1.5329, 1.0931, 1.4911};
   for (size_t i = 0; i < 16; i++) {
