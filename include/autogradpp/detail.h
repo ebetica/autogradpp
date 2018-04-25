@@ -39,6 +39,19 @@ using Tensor = at::Tensor;
 using Container = std::shared_ptr<ContainerImpl>;
 using Optimizer = std::shared_ptr<OptimizerImpl>;
 
+class Variant;
+using VariantType = mapbox::util::variant<
+    Variable,
+    std::string,
+    float,
+    double, 
+    bool, 
+    int32_t,
+    int64_t,
+    mapbox::util::recursive_wrapper<std::vector<Variant>>,
+    mapbox::util::recursive_wrapper<std::unordered_map<std::string, Variant>>
+>;
+
 #define GEN_TYPE(TYP, NAME) \
   Variant(TYP);             \
   bool is ## NAME () const; \
@@ -89,17 +102,7 @@ class Variant {
   at::Type& type() const;
 
  private:
-  mapbox::util::variant<
-    Variable,
-    std::string,
-    float,
-    double, 
-    bool, 
-    int32_t,
-    int64_t,
-    mapbox::util::recursive_wrapper<std::vector<Variant>>,
-    mapbox::util::recursive_wrapper<std::unordered_map<std::string, Variant>>
-      > variant_;
+  VariantType value_;
 };
 
 template<> inline Variable Variant::operator+(Variant other) const { return get() + other.get(); }

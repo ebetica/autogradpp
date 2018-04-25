@@ -287,14 +287,14 @@ void BatchNorm::reset_parameters() {
 Variant BatchNorm::forward(Variant const& inputs) {
   Variable input, running_mean, running_var;
   if (stateful_) {
+    input = inputs.get();
+    running_mean = this->running_mean;
+    running_var = this->running_var;
+  } else {
     auto lst = inputs.getList();
     input = lst[0].get();
     running_mean = lst[1].get();
     running_var = lst[2].get();
-  } else {
-    input = inputs.get();
-    running_mean = this->running_mean;
-    running_var = this->running_var;
   }
 
   if (train_) {
@@ -631,7 +631,8 @@ Variant Dropout::forward(Variant const& inputs) {
     return inputs;
   else if (inputs.isVariable()) {
     auto x = inputs.get();
-    auto noise = x.data().type().tensor(x.sizes()).uniform_(0, 1)
+    auto noise = x.data().type().tensor(x.sizes())
+      .uniform_(0, 1)
       .m([](const Tensor& self, float other) { return self > other;}, p_)
       .toType(x.type().scalarType())
       .mul_(1. / (1 - p_));
@@ -659,6 +660,7 @@ Variant Dropout2d::forward(Variant const& inputs) {
   else if (inputs.isVariable()) {
     auto x = inputs.get();
     auto noise = x.data().type().tensor({x.size(0), x.size(1), 1, 1})
+      .uniform_(0, 1)
       .m([](const Tensor& self, at::Scalar other) { return self > other;}, p_)
       .toType(x.type().scalarType())
       .mul_(1. / (1 - p_));
