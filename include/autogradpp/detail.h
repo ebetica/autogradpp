@@ -59,6 +59,10 @@ using VariantType = mapbox::util::variant<
 
 class Variant {
  public:
+  Variant() = default;
+  Variant(const Variant&) = default;
+  Variant(Variant&&) = default;
+  Variant& operator=(Variant&&) = default;
   Variant(Tensor);
   Variant(Variable);
   Variant(const std::string&);
@@ -68,10 +72,15 @@ class Variant {
   Variant(std::unordered_map<std::string, Variant>&);
   Variant(std::unordered_map<std::string, Variant>&&);
 
+  Variable&                                             get();
+  std::vector<Variant>&                                 getList();
+  std::unordered_map<std::string, Variant>&             getDict();
+
   Variable const&                                       get() const;
-  std::string const&                                    getString() const;
   std::vector<Variant> const&                           getList() const;
   std::unordered_map<std::string, Variant> const&       getDict() const;
+
+  std::string const&                                    getString() const;
   bool                                                  isVariable() const;
   bool                                                  isString() const;
   bool                                                  isList() const;

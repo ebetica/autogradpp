@@ -88,14 +88,23 @@ Variant::Variant(std::initializer_list<Variable> l) {
 Variant::Variant(std::unordered_map<std::string, Variant>& x) { value_ = x; };
 Variant::Variant(std::unordered_map<std::string, Variant>&& x) { value_ = std::move(x); }
 
+Variable& Variant::get() { return value_.get<Variable>(); }
+std::vector<Variant>& Variant::getList() {
+  return value_.get<mapbox::util::recursive_wrapper<std::vector<Variant>>>().get();
+}
+std::unordered_map<std::string, Variant>& Variant::getDict() {
+  return value_.get<mapbox::util::recursive_wrapper<std::unordered_map<std::string, Variant>>>().get();
+}
+
 Variable const& Variant::get() const { return value_.get<Variable>(); }
-std::string const& Variant::getString() const { return value_.get<std::string>(); }
 std::vector<Variant> const& Variant::getList() const {
   return value_.get<mapbox::util::recursive_wrapper<std::vector<Variant>>>().get();
 }
 std::unordered_map<std::string, Variant> const& Variant::getDict() const {
   return value_.get<mapbox::util::recursive_wrapper<std::unordered_map<std::string, Variant>>>().get();
 }
+
+std::string const& Variant::getString() const { return value_.get<std::string>(); }
 bool Variant::isVariable() const {
   return value_.is<Variable>();
 }
