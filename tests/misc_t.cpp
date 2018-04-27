@@ -4,7 +4,7 @@ CASE("misc/no_grad/1") {
   no_grad_guard guard;
   auto model = Linear(5, 2).make();
   auto x = Var(at::CPU(at::kFloat).randn({10, 5}), true);
-  auto y = model->forward({x})[0];
+  auto y = model->forward(x).get();
   Variable s = y.sum();
 
   backward(s);

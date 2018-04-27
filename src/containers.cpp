@@ -1,6 +1,13 @@
 #include "autogradpp/containers.h"
 
 namespace autograd {
+std::function<Variant(Variant const&)> ContainerImpl::functor() {
+  return [this](Variant const & x) { return this->forward(x); };
+}
+Variant ContainerImpl::forward(Variant&& x) {
+  return this->forward(x);
+}
+
 std::map<std::string, Variable> ContainerImpl::parameters() const {
   std::map<std::string, Variable> ret;
   for (auto pair : children_) {
@@ -116,19 +123,19 @@ at::Type& ContainerImpl::DefaultTensor(at::ScalarType s) {
     return at::CPU(s);
 }
 
-variable_list Linear::forward(variable_list input) {
-  auto x = input[0];
+Variant Linear::forward(Variant const& input) {
+  auto x = input.get();
   if (x.ndimension() == 2 && !no_bias_) {
     // Fused op is marginally faster
     assert(x.size(1) == weight.size(1));
-    return variable_list({at::addmm(bias, x, weight.t())});
+    return at::addmm(bias, x, weight.t());
   }
 
   auto output = x.matmul(weight.t());
   if (!no_bias_) {
     output += bias;
   }
-  return variable_list({output});
+  return output;
 }
 
 void Linear::reset_parameters() {
@@ -147,9 +154,9 @@ void Linear::initialize_parameters() {
   }
 }
 
-variable_list Embedding::forward(variable_list input) {
-  auto x = input[0];
-  return variable_list({at::embedding(weight, x, -1, false, false)});
+Variant Embedding::forward(Variant const& input) {
+  auto x = input.get();
+  return at::embedding(weight, x, -1, false, false);
 }
 
 void Embedding::reset_parameters() {
@@ -204,8 +211,8 @@ void Conv::reset_parameters() {
   }
 }
 
-variable_list Conv::forward(variable_list input) {
-  auto x = input[0];
+Variant Conv::forward(Variant const& input) {
+  auto x = input.get();
   if (Nd_ == 1) {
     assert(x.ndimension() == 3);
     x = x.unsqueeze(-1); // TODO: Use conv1d once available
@@ -248,7 +255,7 @@ variable_list Conv::forward(variable_list input) {
     }
   }
 
-  return variable_list({out});
+  return out;
 }
 
 void BatchNorm::initialize_parameters() {
@@ -277,10 +284,18 @@ void BatchNorm::reset_parameters() {
   }
 }
 
-variable_list BatchNorm::forward(variable_list inputs) {
-  auto& input = inputs[0];
-  auto& running_mean = (stateful_ ? this->running_mean : inputs[1]);
-  auto& running_var = (stateful_ ? this->running_var : inputs[2]);
+Variant BatchNorm::forward(Variant const& inputs) {
+  Variable input, running_mean, running_var;
+  if (stateful_) {
+    input = inputs.get();
+    running_mean = this->running_mean;
+    running_var = this->running_var;
+  } else {
+    auto lst = inputs.getList();
+    input = lst[0].get();
+    running_mean = lst[1].get();
+    running_var = lst[2].get();
+  }
 
   if (train_) {
     const auto num_channels = input.dim() > 1 ? input.size(1) : 1;
@@ -301,7 +316,7 @@ variable_list BatchNorm::forward(variable_list inputs) {
       eps_,
       hasCudnn());
 
-  return variable_list({output});
+  return output;
 }
 
 template <typename Derived>
@@ -336,14 +351,15 @@ void RNNBase<Derived>::reset_parameters() {
 }
 
 template <typename Derived>
-variable_list RNNBase<Derived>::GRU_cell_forward(variable_list inputs, int i) {
-  auto x = inputs[0];
-  auto hx = inputs[1].defined()
-      ? inputs[1]
-      : Var(this->DefaultTensor(at::kFloat).zeros({x.size(0), hidden_size_}));
+Variant RNNBase<Derived>::GRU_cell_forward(Variant&& inputs, int i) {
+  auto lst = inputs.getList();
+  auto x = lst[0].get();
+  auto hx = lst[1].get().defined()
+      ? lst[1].get()
+      : Var(x.data().type().zeros({x.size(0), hidden_size_}));
 
-  auto gi = i2h[i]->forward({x})[0];
-  auto gh = h2h[i]->forward({hx})[0];
+  auto gi = i2h[i]->forward(x).get();
+  auto gh = h2h[i]->forward(hx).get();
   auto gic = gi.chunk(3, 1);
   auto ghc = gh.chunk(3, 1);
 
@@ -352,46 +368,48 @@ variable_list RNNBase<Derived>::GRU_cell_forward(variable_list inputs, int i) {
   auto new_gate = (gic[2] + reset_gate * ghc[2]).tanh_();
   auto hy = new_gate + input_gate * (hx - new_gate);
 
-  return variable_list({hy});
+  return hy;
 }
 
 template <typename Derived>
-variable_list RNNBase<Derived>::RNN_TANH_cell_forward(
-    variable_list inputs,
+Variant RNNBase<Derived>::RNN_TANH_cell_forward(
+    Variant&& inputs,
     int i) {
-  auto x = inputs[0];
-  auto hx = inputs[1].defined()
-      ? inputs[1]
-      : Var(this->DefaultTensor(at::kFloat).zeros({x.size(0), hidden_size_}));
+  auto lst = inputs.getList();
+  auto x = lst[0].get();
+  auto hx = lst[1].get().defined()
+      ? lst[1].get()
+      : Var(x.data().type().zeros({x.size(0), hidden_size_}));
 
-  auto h = (i2h[i]->forward({x})[0] + h2h[i]->forward({hx})[0]).tanh();
-  return variable_list({h});
+  auto h = i2h[i]->forward(x).get() + h2h[i]->forward(hx).get();
+  return h.tanh();
 }
 
 template <typename Derived>
-variable_list RNNBase<Derived>::RNN_RELU_cell_forward(
-    variable_list inputs,
+Variant RNNBase<Derived>::RNN_RELU_cell_forward(
+    Variant&& inputs,
     int i) {
-  auto x = inputs[0];
-  auto hx = inputs[1].defined()
-      ? inputs[1]
-      : Var(this->DefaultTensor(at::kFloat).zeros({x.size(0), hidden_size_}));
+  auto lst = inputs.getList();
+  auto x = lst[0].get();
+  auto hx = lst[1].get().defined()
+      ? lst[1].get()
+      : Var(x.data().type().zeros({x.size(0), hidden_size_}));
 
-  auto h = (i2h[i]->forward({x})[0] + h2h[i]->forward({hx})[0]).clamp_min(0);
-  return variable_list({h});
+  auto h = i2h[i]->forward(x).get() + h2h[i]->forward(hx).get();
+  return at::relu(h);
 }
 
 template <typename Derived>
-variable_list RNNBase<Derived>::LSTM_cell_forward(variable_list inputs, int i) {
-  auto x = inputs[0];
-  auto hid = inputs[1].defined()
-      ? inputs[1]
-      : Var(this->DefaultTensor(at::kFloat)
-                .zeros({2, x.size(0), hidden_size_}));
+Variant RNNBase<Derived>::LSTM_cell_forward(Variant&& inputs, int i) {
+  auto lst = inputs.getList();
+  auto x = lst[0].get();
+  auto hid = lst[1].get().defined()
+      ? lst[1].get()
+      : Var(x.data().type().zeros({2, x.size(0), hidden_size_}));
   auto hx = hid[0];
   auto cx = hid[1];
 
-  auto gates = i2h[i]->forward({x})[0] + h2h[i]->forward({hx})[0];
+  auto gates = i2h[i]->forward(x).get() + h2h[i]->forward(hx).get();
 
   auto chunked = gates.chunk(4, 1);
   auto in_gate = chunked[0].sigmoid();
@@ -402,30 +420,32 @@ variable_list RNNBase<Derived>::LSTM_cell_forward(variable_list inputs, int i) {
   auto cy = (forget_gate * cx) + (in_gate * cell_gate);
   auto hy = out_gate * cy.tanh();
 
-  return variable_list({at::stack({hy, cy}, 0)});
+  return at::stack({hy, cy}, 0);
 }
 
 template <typename Derived>
-variable_list RNNBase<Derived>::cell_forward(variable_list inputs, int i) {
+Variant RNNBase<Derived>::cell_forward(Variant&& inputs, int i) {
   if (mode_ == RNNMode::LSTM)
-    return LSTM_cell_forward(inputs, i);
+    return LSTM_cell_forward(std::move(inputs), i);
   else if (mode_ == RNNMode::GRU)
-    return GRU_cell_forward(inputs, i);
+    return GRU_cell_forward(std::move(inputs), i);
   else if (mode_ == RNNMode::RNN_TANH)
-    return RNN_TANH_cell_forward(inputs, i);
+    return RNN_TANH_cell_forward(std::move(inputs), i);
   else if (mode_ == RNNMode::RNN_RELU)
-    return RNN_RELU_cell_forward(inputs, i);
+    return RNN_RELU_cell_forward(std::move(inputs), i);
   else
     throw std::runtime_error("No such RNN mode");
 }
 
 template <typename Derived>
-variable_list RNNBase<Derived>::autograd_forward(variable_list inputs) {
-  auto inp = inputs[0];
+Variant RNNBase<Derived>::autograd_forward(Variant&& inputs) {
+  auto lst = inputs.getList();
+  auto inp = lst[0].get();
 
   std::vector<Tensor> hidden;
   for (size_t i = 0; i < nlayers_; i++) {
-    hidden.push_back(inputs[1].defined() ? inputs[1][i] : tag::Variable());
+    auto v = lst[1].get();
+    hidden.emplace_back(v.defined() ? v[i] : tag::Variable());
   }
 
   auto output =
@@ -435,8 +455,7 @@ variable_list RNNBase<Derived>::autograd_forward(variable_list inputs) {
   for (auto t = 0U; t < inp.size(0); t++) {
     auto x = inp.select(0, t);
     for (size_t i = 0; i < nlayers_; i++) {
-      auto layer_output = cell_forward({x, hidden[i]}, i);
-      hidden[i] = layer_output[0];
+      hidden[i] = cell_forward({x, hidden[i]}, i).get();
       if (mode_ == RNNMode::LSTM) {
         x = hidden[i][0];
       } else {
@@ -445,13 +464,13 @@ variable_list RNNBase<Derived>::autograd_forward(variable_list inputs) {
       auto output_slice = output.select(0, t);
       output_slice.copy_(x);
       if (dropout_ > 0 && i != nlayers_ - 1) {
-        x = dropout_module->forward({x})[0];
+        x = dropout_module->forward(x).get();
       }
     }
   }
 
   auto hidout = at::stack(hidden, 0);
-  return variable_list({output, hidout});
+  return {output, hidout};
 }
 
 template <typename Derived>
@@ -508,7 +527,7 @@ bool RNNBase<Derived>::flatten_parameters() {
 }
 
 template <typename Derived>
-variable_list RNNBase<Derived>::CUDNN_forward(variable_list inputs) {
+Variant RNNBase<Derived>::CUDNN_forward(Variant&& inputs) {
   std::vector<Tensor> weight_list;
   for (size_t i = 0; i < nlayers_; i++) {
     weight_list.push_back(i2h[i]->param("weight"));
@@ -520,16 +539,22 @@ variable_list RNNBase<Derived>::CUDNN_forward(variable_list inputs) {
   }
   auto weight_stride0 = no_bias_ ? 2 : 4;
 
-  auto x = inputs[0];
+  auto lst = inputs.getList();
+  auto x = lst[0].get();
   Variable hx, cx;
-  if (!inputs[1].defined()) {
+  if (!lst[1].get().defined()) {
     hx = x.type().zeros({nlayers_, x.size(1), hidden_size_});
     if (mode_ == RNNMode::LSTM) {
       cx = x.type().zeros({nlayers_, x.size(1), hidden_size_});
     }
   } else {
-    hx = mode_ == RNNMode::LSTM ? inputs[1][0] : inputs[1];
-    cx = mode_ == RNNMode::LSTM ? inputs[1][1] : Variable();
+    if (mode_ == RNNMode::LSTM) {
+      hx = lst[1].get()[0];
+      cx = lst[1].get()[1];
+    } else {
+      hx = lst[1].get();
+      cx = Variable();
+    }
   }
   auto dropout_state = x.type().tensor();
 
@@ -569,23 +594,28 @@ variable_list RNNBase<Derived>::CUDNN_forward(variable_list inputs) {
       ? at::stack({std::get<1>(tup), std::get<2>(tup)}, 0)
       : std::get<1>(tup);
   Variable output = std::get<0>(tup);
-  return variable_list({output, hidout});
+  return {output, hidout};
 }
 
 template <typename Derived>
-variable_list RNNBase<Derived>::forward(variable_list inputs) {
-  variable_list inp;
-  inp.push_back(inputs[0]);
-  if (inputs.size() > 1) {
-    inp.push_back(inputs[1]);
+Variant RNNBase<Derived>::forward(Variant const& input) {
+  std::vector<Variant> inp;
+  if (input.isList()) {
+    auto lst = input.getList();
+    if (lst.size() != 2) {
+      throw std::runtime_error("RNN takes a list of the input and hidden");
+    }
+    inp.push_back(lst[0]);
+    inp.push_back(lst[1]);
   } else {
+    inp.push_back(input.get());
     inp.push_back(Variable());
   }
 
   // Dropout descriptors aren't in C++ in PyTorch yet...
-  auto output = at::cudnn_is_acceptable(inp[0]) && dropout_ == 0
-      ? CUDNN_forward(inp)
-      : autograd_forward(inp);
+  auto output = at::cudnn_is_acceptable(inp[0].get()) && dropout_ == 0
+      ? CUDNN_forward(std::move(inp))
+      : autograd_forward(std::move(inp));
 
   return output;
 }
@@ -602,32 +632,60 @@ void RNNBase<Derived>::cpu() {
   flatten_parameters();
 }
 
-variable_list Dropout::forward(variable_list inputs) {
+Variant Dropout::forward(Variant const& inputs) {
   if (p_ == 0 || !this->train_)
     return inputs;
-  variable_list lst;
-  for (auto x : inputs) {
-    auto noise = x.data().type().tensor(x.sizes());
-    noise = (noise.uniform_(0, 1) > p_)
-                .toType(x.type().scalarType())
-                .mul_(1. / (1 - p_));
-    lst.push_back(x * Var(noise));
+  else if (inputs.isVariable()) {
+    auto x = inputs.get();
+    auto noise = x.data().type().tensor(x.sizes())
+      .uniform_(0, 1)
+      .m([](const Tensor& self, float other) { return self > other;}, p_)
+      .toType(x.type().scalarType())
+      .mul_(1. / (1 - p_));
+    return x * Var(noise);
+  } else if (inputs.isList()) {
+    std::vector<Variant> lst;
+    for (auto& var : inputs.getList()) {
+      lst.emplace_back(this->forward(var));
+    }
+    return lst;
+  } else if (inputs.isDict()) {
+    std::unordered_map<std::string, Variant> dict;
+    for (auto& var : inputs.getDict()) {
+      dict.emplace(var.first, this->forward(var.second));
+    }
+    return dict;
+  } else {
+    throw std::runtime_error("Type of input not supported for Dropout");
   }
-  return lst;
 }
 
-variable_list Dropout2d::forward(variable_list inputs) {
+Variant Dropout2d::forward(Variant const& inputs) {
   if (p_ == 0 || !this->train_)
     return inputs;
-  variable_list lst;
-  for (auto x : inputs) {
-    auto noise = x.data().type().tensor({x.size(0), x.size(1), 1, 1});
-    noise = (noise.uniform_(0, 1) > p_)
-                .toType(x.type().scalarType())
-                .mul_(1. / (1 - p_));
-    lst.push_back(x * Var(noise));
+  else if (inputs.isVariable()) {
+    auto x = inputs.get();
+    auto noise = x.data().type().tensor({x.size(0), x.size(1), 1, 1})
+      .uniform_(0, 1)
+      .m([](const Tensor& self, at::Scalar other) { return self > other;}, p_)
+      .toType(x.type().scalarType())
+      .mul_(1. / (1 - p_));
+    return x * Var(noise);
+  } else if (inputs.isList()) {
+    std::vector<Variant> lst;
+    for (auto& var : inputs.getList()) {
+      lst.emplace_back(this->forward(var));
+    }
+    return lst;
+  } else if (inputs.isDict()) {
+    std::unordered_map<std::string, Variant> dict;
+    for (auto& var : inputs.getDict()) {
+      dict.emplace(var.first, this->forward(var.second));
+    }
+    return dict;
+  } else {
+    throw std::runtime_error("Type of input not supported for Dropout");
   }
-  return lst;
 }
 
 } // namespace autograd

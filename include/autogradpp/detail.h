@@ -3,6 +3,8 @@
 #include <map>
 #include <memory>
 
+#include <mapbox/variant.hpp>
+
 #include "torch/csrc/autograd/engine.h"
 #include "torch/csrc/autograd/grad_mode.h"
 
@@ -33,10 +35,77 @@ extern tag::Engine engine;
 class ContainerImpl;
 class OptimizerImpl;
 using Variable = tag::Variable;
-using variable_list = tag::variable_list;
 using Tensor = at::Tensor;
 using Container = std::shared_ptr<ContainerImpl>;
 using Optimizer = std::shared_ptr<OptimizerImpl>;
+
+class Variant;
+using VariantType = mapbox::util::variant<
+    Variable,
+    std::string,
+    float,
+    double, 
+    bool, 
+    int32_t,
+    int64_t,
+    mapbox::util::recursive_wrapper<std::vector<Variant>>,
+    mapbox::util::recursive_wrapper<std::unordered_map<std::string, Variant>>
+>;
+
+#define GEN_TYPE(TYP, NAME) \
+  Variant(TYP);             \
+  bool is ## NAME () const; \
+  TYP get ## NAME () const;
+
+class Variant {
+ public:
+  Variant() = default;
+  Variant(const Variant&) = default;
+  Variant(Variant&&) = default;
+  Variant& operator=(Variant&&) = default;
+  Variant(Tensor);
+  Variant(Variable);
+  Variant(const std::string&);
+  Variant(std::vector<Variant>&);
+  Variant(std::vector<Variant>&&);
+  Variant(std::initializer_list<Variable>);
+  Variant(std::unordered_map<std::string, Variant>&);
+  Variant(std::unordered_map<std::string, Variant>&&);
+
+  Variable&                                             get();
+  std::vector<Variant>&                                 getList();
+  std::unordered_map<std::string, Variant>&             getDict();
+
+  Variable const&                                       get() const;
+  std::vector<Variant> const&                           getList() const;
+  std::unordered_map<std::string, Variant> const&       getDict() const;
+
+  std::string const&                                    getString() const;
+  bool                                                  isVariable() const;
+  bool                                                  isString() const;
+  bool                                                  isList() const;
+  bool                                                  isDict() const;
+  GEN_TYPE(float,      Float);
+  GEN_TYPE(double,     Double);
+  GEN_TYPE(bool,       Bool);
+  GEN_TYPE(int32_t,    Int32);
+  GEN_TYPE(int64_t,    Int64);
+
+  template <typename T>
+  T get() {
+    return value_.get<T>();
+  }
+
+  template <typename F, typename... Args> 
+  auto m(F func, Args&&... params) const {
+    return func(get(), std::forward<Args>(params)...);
+  } 
+
+ private:
+  VariantType value_;
+};
+
+#undef GEN_TYPE
 
 void backward(Tensor loss, bool keep_graph = false);
 

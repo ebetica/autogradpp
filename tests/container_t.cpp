@@ -8,7 +8,7 @@ AUTOGRAD_CONTAINER_CLASS(TestModel) {
     add(Linear(5, 100).make(), "l3");
   }
 
-  variable_list forward(variable_list input) override { return input; };
+  Variant forward(Variant const& input) override { return input; };
 };
 
 AUTOGRAD_CONTAINER_CLASS(NestedModel) {
@@ -22,13 +22,13 @@ AUTOGRAD_CONTAINER_CLASS(NestedModel) {
     add(Var(DefaultTensor(at::kFloat).tensor({3, 2, 21}), false), "param");
   }
 
-  variable_list forward(variable_list input) override { return input; };
+  Variant forward(Variant const& input) override { return input; };
 };
 
 CASE("containers/conv2d/even") {
   auto model = Conv2d(3, 2, 3).stride(2).make();
   auto x = Var(at::CPU(at::kFloat).randn({2, 3, 5, 5}), true);
-  auto y = model->forward({x})[0];
+  auto y = model->forward(x).get();
   Variable s = y.sum();
 
   backward(s);
@@ -44,7 +44,7 @@ CASE("containers/conv2d/even") {
 CASE("containers/conv2d/uneven") {
   auto model = Conv2d(3, 2, IntVec({3, 2})).stride(2).make();
   auto x = Var(at::CPU(at::kFloat).randn({2, 3, 5, 4}), true);
-  auto y = model->forward({x})[0];
+  auto y = model->forward(x).get();
   Variable s = y.sum();
 
   backward(s);
@@ -60,7 +60,7 @@ CASE("containers/conv2d/uneven") {
 CASE("containers/conv1d/even") {
   auto model = Conv1d(3, 2, 3).stride(2).make();
   auto x = Var(at::CPU(at::kFloat).randn({2, 3, 5}), true);
-  auto y = model->forward({x})[0];
+  auto y = model->forward(x).get();
   Variable s = y.sum();
 
   backward(s);
@@ -76,7 +76,7 @@ CASE("containers/conv1d/even") {
 CASE("containers/conv3d/even") {
   auto model = Conv3d(3, 2, 3).stride(2).make();
   auto x = Var(at::CPU(at::kFloat).randn({2, 3, 5, 5, 5}), true);
-  auto y = model->forward({x})[0];
+  auto y = model->forward(x).get();
   Variable s = y.sum();
 
   backward(s);
@@ -92,7 +92,7 @@ CASE("containers/conv3d/even") {
 CASE("containers/linear/basic1") {
   auto model = Linear(5, 2).make();
   auto x = Var(at::CPU(at::kFloat).randn({10, 5}), true);
-  auto y = model->forward({x})[0];
+  auto y = model->forward(x).get();
   Variable s = y.sum();
 
   backward(s);
@@ -113,7 +113,7 @@ CASE("containers/linear/sequential") {
 
   auto x = Var(at::CPU(at::kFloat).randn({1000, 10}));
   for (auto layer : *model) {
-    x = layer->forward({x})[0];
+    x = layer->forward(x).get();
     x = x.clamp_min(0);  // relu
   }
 
@@ -130,10 +130,11 @@ CASE("containers/linear/simple") {
   auto l2 = model->add(Linear(3, 5).make(), "l2");
   auto l3 = model->add(Linear(5, 100).make(), "l3");
 
-  auto x = Var(at::CPU(at::kFloat).randn({1000, 10}));
-  x = l1->forward({x})[0].clamp_min(0);
-  x = l2->forward({x})[0].clamp_min(0);
-  x = l3->forward({x})[0].clamp_min(0);
+  Variable x = Var(at::CPU(at::kFloat).randn({1000, 10}))
+    .m(l1->functor()).m(at::relu)
+    .m(l2->functor()).m(at::relu)
+    .m(l3->functor()).m(at::relu)
+    ;
 
   backward(x);
   EXPECT(x.ndimension() == 2);
@@ -162,7 +163,7 @@ CASE("containers/embedding/basic") {
   auto model = Embedding(dict_size, 2).make();
   // Cannot get gradients to change indices (input) - only for embedding params
   auto x = Var(at::CPU(at::kLong).tensor({10}).fill_(dict_size - 1), false);
-  auto y = model->forward({x})[0];
+  auto y = model->forward(x).get();
   Variable s = y.sum();
 
   backward(s);
@@ -177,7 +178,7 @@ CASE("containers/embedding/basic") {
 CASE("containers/embedding/list") {
   auto model = Embedding(6, 4).make();
   auto x = Var(at::CPU(at::kLong).tensor({2, 3}).fill_(5), false);
-  auto y = model->forward({x})[0];
+  auto y = model->forward(x).get();
   Variable s = y.sum();
 
   backward(s);
@@ -192,7 +193,7 @@ CASE("containers/cuda/1") {
   auto model = Linear(5, 2).make();
   model->cuda();
   auto x = Var(at::CUDA(at::kFloat).randn({10, 5}), true);
-  auto y = model->forward({x})[0];
+  auto y = model->forward(x).get();
   Variable s = y.sum();
 
   backward(s);
@@ -210,7 +211,7 @@ CASE("containers/cuda/2") {
   model->cuda();
   model->cpu();
   auto x = Var(at::CPU(at::kFloat).randn({10, 5}), true);
-  auto y = model->forward({x})[0];
+  auto y = model->forward(x).get();
   Variable s = y.sum();
 
   backward(s);
@@ -225,7 +226,7 @@ CASE("containers/cuda/2") {
 CASE("containers/dropout/1") {
   auto dropout = Dropout(0.5).make();
   Variable x = Var(at::CPU(at::kFloat).ones(100));
-  Variable y = dropout->forward({x})[0];
+  Variable y = dropout->forward(x).get();
 
   backward(y);
   EXPECT(y.ndimension() == 1);
@@ -234,7 +235,7 @@ CASE("containers/dropout/1") {
   EXPECT(y.sum().toCFloat() > 70); // Probably
 
   dropout->eval();
-  y = dropout->forward({x})[0];
+  y = dropout->forward(x).get();
   EXPECT(y.data().sum().toCFloat() == 100);
 };
 

@@ -18,7 +18,7 @@ bool test_optimizer_xor(Optimizer optim, std::shared_ptr<ContainerList> model) {
     // forward
     auto x = Var(inp);
     auto y = Var(lab, false);
-    for (auto layer : *model) x = layer->forward({x})[0].sigmoid_();
+    for (auto layer : *model) x = layer->forward(x).get().sigmoid();
     Variable loss = at::binary_cross_entropy(x, y);
 
     optim->zero_grad();

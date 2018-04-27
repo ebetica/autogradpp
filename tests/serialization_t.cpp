@@ -167,7 +167,7 @@ CASE("serialization/xor") {
     // forward
     auto x = Var(inp);
     auto y = Var(lab, false);
-    for (auto layer : *model) x = layer->forward({x})[0].sigmoid_();
+    for (auto layer : *model) x = layer->forward(x).get().sigmoid();
     return at::binary_cross_entropy(x, y);
   };
 
@@ -229,7 +229,7 @@ CASE("serialization/optim") {
 
   auto step = [&](Optimizer optim, Container model) {
     optim->zero_grad();
-    auto y = model->forward({x})[0].sum();
+    auto y = model->forward(x).get().sum();
     backward(y);
     optim->step();
   };
